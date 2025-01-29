@@ -140,6 +140,28 @@ class GromacsXtcFile(SQLModel, table=True):
     files: File = Relationship(back_populates="gromacs_xtc_files")
     pass
 
+######################
+### "Types" Tables ###
+######################
+
+class FileType(SQLModel, table=True):
+    __tablename__ = "file_types"
+
+    file_type_id: int = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+class MoleculeType(SQLModel, table=True):
+    __tablename__ = "molecule_types"
+
+    molecule_type_id: int = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+class Database(SQLModel, table=True):
+    __tablename__ = "databases"
+
+    database_id: int = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
 ######################################
 ### Many-to-Many (MtM) Link Tables ###
 ######################################
