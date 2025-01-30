@@ -28,9 +28,8 @@ class Dataset(SQLModel, table=True):
     # Relationships: file, origin, author, molecule
     file: List[File] = Relationship(back_populates="dataset")
     origin: DatasetOrigin = Relationship(back_populates="dataset")
-    author: List[Author] = Relationship(back_populates="dataset", link_table="datasets_authors") # CHECK THIS
-    molecule: List[Molecule] = Relationship(back_populates="dataset", link_table="datasets_molecules") # CHECK THIS
-    pass
+    author: List[Author] = Relationship(back_populates="dataset", link_table="dataset_author")
+    molecule: Optional[List[Molecule]] = Relationship(back_populates="dataset", link_table="dataset_molecule")
 
 class File(SQLModel, table=True):
     __tablename__ = "file"
@@ -54,7 +53,7 @@ class File(SQLModel, table=True):
     files: List[File] = Relationship(back_populates="file") # CHECK THIS
     zip_files: List[File] = Relationship(back_populates="file") # CHECK THIS
 
-    datasets: Dataset = Relationship(back_populates="file")
+    dataset: Dataset = Relationship(back_populates="file")
     topology_file: Optional[TopologyFile] = Relationship(back_populates="file")
     parameter_file: Optional[ParameterFile] = Relationship(back_populates="file")
     trajectory_file: Optional[TrajectoryFile] = Relationship(back_populates="file")
@@ -70,8 +69,7 @@ class Author(SQLModel, table=True):
     orcid: Optional[int] = Field(default=None, unique=True)
 
     # Relationships: dataset
-    datasets: List[Dataset] = Relationship(back_populates="author") # CHECK THIS
-    pass
+    dataset: List[Dataset] = Relationship(back_populates="author", link_table="dataset_author")
 
 class Molecule(SQLModel, table=True):
     __tablename__ = "molecule"
@@ -82,11 +80,10 @@ class Molecule(SQLModel, table=True):
     sequence: str
 
     # Relationships: dataset, topology_file, molecule_external_db, molecule_type
-    dataset: List[Dataset] = Relationship(back_populates="molecule", link_table="datasets_molecules") # CHECK THIS
-    topolgy_file: List[TopologyFile] = Relationship(back_populates="molecule", link_table="molecules_gro") # CHECK THIS
+    dataset: List[Dataset] = Relationship(back_populates="molecule", link_table="dataset_molecule")
+    topolgy_file: List[TopologyFile] = Relationship(back_populates="molecule", link_table="molecule_topology")
     molecule_external_db: Optional[List[MoleculeExternalDb]] = Relationship(back_populates="molecule")
     molecule_type: Optional[MoleculeType] = Relationship(back_populates="molecule")
-    pass
 
 class MoleculeExternalDb(SQLModel, table=True):
     __tablename__ = "molecule_external_db"
@@ -118,9 +115,8 @@ class TopologyFile(SQLModel, table=True):
     molecule_id: int = Field(foreign_key="molecule.id")
 
     # Relationships: file, molecule
-    files: File = Relationship(back_populates="topology_file")
-    molecules: Molecule = Relationship(back_populates="topology_file", link_table="molecules_gro") # CHECK THIS
-    pass
+    file: File = Relationship(back_populates="topology_file")
+    molecule: List[Molecule] = Relationship(back_populates="topology_file", link_table="molecule_topology")
 
 class ParameterFile(SQLModel, table=True):
     __tablename__ = "parameter_file"
@@ -231,32 +227,32 @@ class Integrator(SQLModel, table=True):
 
 class DatsetAuthor(SQLModel, table=True):
     """
-    MtM link table between Datasets and Authors 
+    MtM link table between Dataset and Author
     LOGIC: A dataset can have many authors and an author can have published many datasets.
     """
-    __tablename__ = "datasets_authors"
+    __tablename__ = "dataset_author"
 
-    dataset_id: int = Field(foreign_key="datasets.id", primary_key=True)
-    author_id: int = Field(foreign_key="authors.id", primary_key=True)
+    dataset_id: int = Field(foreign_key="dataset.id", primary_key=True)
+    author_id: int = Field(foreign_key="author.id", primary_key=True)
 
 
 class DatasetMolecule(SQLModel, table=True):
     """
-    MtM link table between Datasets and Molecules
+    MtM link table between Dataset and Molecule
     LOGIC: A dataset can have zero or many molecules and if we have a molecule, it is definitely in a dataset.
     """
-    __tablename__ = "datasets_molecules"
+    __tablename__ = "dataset_molecule"
 
-    dataset_id: int = Field(foreign_key="datasets.id", primary_key=True)
-    molecule_id: Optional[int] = Field(default=None, foreign_key="molecules.id", primary_key=True)
+    dataset_id: int = Field(foreign_key="dataset.id", primary_key=True)
+    molecule_id: Optional[int] = Field(default=None, foreign_key="molecule.id", primary_key=True)
 
 
-class MoleculeGro(SQLModel, table=True):
+class MoleculeTopology(SQLModel, table=True):
     """
-    MtM link table between Molecules and GromacsGroFiles
-    LOGIC: A molecule is definitely in one or more GRO files and a GRO file necessarily has one or more molecules.
+    MtM link table between Molecule and TopologyFile
+    LOGIC: A molecule is definitely in one or more topology files and a topology file necessarily has one or more molecules.
     """
-    __tablename__ = "molecules_gro"
+    __tablename__ = "molecule_topology"
 
-    molecule_id: int = Field(foreign_key="molecules.id", primary_key=True)
-    file_id: int = Field(foreign_key="files.id", primary_key=True)
+    molecule_id: int = Field(foreign_key="molecule.id", primary_key=True)
+    file_id: int = Field(foreign_key="file.id", primary_key=True)
