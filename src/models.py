@@ -1,126 +1,131 @@
 # Imports
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, List
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 from datetime import datetime
 
 class Dataset(SQLModel, table=True):
-    __tablename__ = "datasets"
+    __tablename__ = "dataset"
 
-    dataset_id: int = Field(default=None, primary_key=True)
-    origin: str = Field(index=True)
+    dataset_id: Optional[int] = Field(default=None, primary_key=True)
+    origin_id: int = Field(foreign_key="dataset_origin.origin_id")
     id_in_origin: str
     doi: str
     date_created: datetime # ("%Y/%m/%d") = Field(index=True) # We only want to index the year
     date_last_modified: datetime #("%Y/%m/%d")
-    date_fetched: datetime #("%Y-%m-%dT%H:%M:%S")
-    file_number: int
-    download_number: int
-    view_number: int
+    date_last_crawled: datetime #("%Y-%m-%dT%H:%M:%S")
+    file_number: int = 0
+    download_number: int = 0
+    view_number: int = 0
     license: str
     url: str
     title: str
-    author_id: int = Field(foreign_key="authors.id")
-    keywords: str = Field(index=True) # keywords separated by ";"
-    description: str
-    molecule_id: int | None = Field(default=None, foreign_key="molecules.id")
+    author_id: int = Field(foreign_key="author.id")
+    keywords: Optional[str] = Field(index=True) # keywords separated by ";"
+    description: Optional[str] = None
+    molecule_id: Optional[int] = Field(default=None, foreign_key="molecule.id")
 
-
-    # Relationships: files, authors, molecules
-    files: list[File] = Relationship(back_populates="datasets")
-    authors: list[Author] = Relationship(back_populates="datasets", link_table="datasets_authors")
-    molecules: list[Molecule] = Relationship(back_populates="datasets", link_table="datasets_molecules")
+    # Relationships: file, origin, author, molecule
+    file: List[File] = Relationship(back_populates="dataset")
+    origin: DatasetOrigin = Relationship(back_populates="dataset")
+    author: List[Author] = Relationship(back_populates="dataset", link_table="datasets_authors") # CHECK THIS
+    molecule: List[Molecule] = Relationship(back_populates="dataset", link_table="datasets_molecules") # CHECK THIS
+    pass
 
 class File(SQLModel, table=True):
-    __tablename__ = "files"
+    __tablename__ = "file"
 
     file_id: int = Field(default=None, primary_key=True)
-    dataset_id: int = Field(foreign_key="datasets.id")
+    dataset_id: int = Field(foreign_key="dataset.id")
     name : str
-    type : str = Field(index=True)
+    file_type_id : int = Field(foreign_key="file_type.id")
     size_in_bytes : int
     md5 : str
     url : str
-    is_from_zip_file : bool = Field(index=True)
-    from_zip_file_id: int | None = Field(default=None, foreign_key="files.id") # If the file is from a zip file, this field will be the id of the zip file
+    is_from_zip_file: bool = Field(index=True)
+    from_zip_file_id: Optional[int] = Field(default=None, foreign_key="file.file_id")
 
+    # Enforce the rule at the database level
+    __table_args__ = (
+        "CHECK ((is_from_zip_file = 1 AND from_zip_file_id IS NOT NULL) OR (is_from_zip_file = 0 AND from_zip_file_id IS NULL))",
+    )
 
-    # Relationships: datasets, files, gromacs_gro_files, gromacs_mdp_files, gromacs_xtc_files
-    files: list[File] = Relationship(back_populates="files")
-    zip_files: list[File] = Relationship(back_populates="files") 
+    # Relationships: dataset, file, topology_file, parameter_file, trajectory_file, software, file_type
+    files: List[File] = Relationship(back_populates="file") # CHECK THIS
+    zip_files: List[File] = Relationship(back_populates="file") # CHECK THIS
 
-    datasets: Dataset = Relationship(back_populates="files")
-    gromacs_gro_files: list[GromacsGroFile] = Relationship(back_populates="files")
-    gromacs_mdp_files: list[GromacsMdpFile] = Relationship(back_populates="files")
-    gromacs_xtc_files: list[GromacsXtcFile] = Relationship(back_populates="files")
-
-    softwares: list[Software] = Relationship(back_populates="files")
+    datasets: Dataset = Relationship(back_populates="file")
+    topology_file: Optional[TopologyFile] = Relationship(back_populates="file")
+    parameter_file: Optional[ParameterFile] = Relationship(back_populates="file")
+    trajectory_file: Optional[TrajectoryFile] = Relationship(back_populates="file")
+    software: Optional[Software] = Relationship(back_populates="file")
+    file_type: FileType = Relationship(back_populates="file")
     pass
 
 class Author(SQLModel, table=True):
-    __tablename__ = "authors"
+    __tablename__ = "author"
 
     author_id: int = Field(default=None, primary_key=True)
     name: str
-    orcid: int | None = Field(default=None, unique=True)
+    orcid: Optional[int] = Field(default=None, unique=True)
 
-
-    # Relationships: datasets
-    datasets: list[Dataset] = Relationship(back_populates="authors")
+    # Relationships: dataset
+    datasets: List[Dataset] = Relationship(back_populates="author") # CHECK THIS
+    pass
 
 class Molecule(SQLModel, table=True):
-    __tablename__ = "molecules"
+    __tablename__ = "molecule"
 
     molecule_id: int = Field(default=None, primary_key=True)
     name: str
     formula: str
     sequence: str
 
-
-    # Relationships: datasets, gromacs_gro_files, molecules_external_db
-    datasets: list[Dataset] = Relationship(back_populates="molecules", link_table="datasets_molecules")
-    gromacs_gro_files: list[GromacsGroFile] = Relationship(back_populates="molecules", link_table="molecules_gro")
-    molecules_external_db: list[MoleculeExternalDb] = Relationship(back_populates="molecules")
+    # Relationships: dataset, topology_file, molecule_external_db, molecule_type
+    dataset: List[Dataset] = Relationship(back_populates="molecule", link_table="datasets_molecules") # CHECK THIS
+    topolgy_file: List[TopologyFile] = Relationship(back_populates="molecule", link_table="molecules_gro") # CHECK THIS
+    molecule_external_db: Optional[List[MoleculeExternalDb]] = Relationship(back_populates="molecule")
+    molecule_type: Optional[MoleculeType] = Relationship(back_populates="molecule")
     pass
 
 class MoleculeExternalDb(SQLModel, table=True):
-    __tablename__ = "molecules_external_db"
+    __tablename__ = "molecule_external_db"
 
     molecule_external_db_id: int = Field(default=None, primary_key=True)
-    molecule_id: int = Field(foreign_key="molecules.id")
+    molecule_id: int = Field(foreign_key="molecule.id")
     db_name: str = Field(index=True)
     id_in_db: str
 
-    # Relationships: molecules
-    molecules: Molecule = Relationship(back_populates="molecules_external_db")
-    pass
+    # Relationships: molecule, database
+    molecule: Molecule = Relationship(back_populates="molecule_external_db")
+    database: Optional[Database] = Relationship(back_populates="molecule_external_db")
 
 ################################
 ### Gromacs Specific Classes ###
 ################################
 
-class GromacsGroFile(SQLModel, table=True):
-    __tablename__ = "gromacs_gro_files"
+class TopologyFile(SQLModel, table=True):
+    __tablename__ = "topology_file"
 
     # File id is both the primary key but also a foreign key to the Files table
-    file_id: int = Field(default=None, primary_key=True, foreign_key="files.id")
+    file_id: int = Field(default=None, primary_key=True, foreign_key="file.id")
     atom_number: int
     has_protein: bool
     has_nucleic: bool
     has_lipid: bool
     has_glucid: bool
     has_water_ion: bool
-    molecule_id: int = Field(foreign_key="molecules.id")
+    molecule_id: int = Field(foreign_key="molecule.id")
 
-    # Relationships: files, molecules
-    files: File = Relationship(back_populates="gromacs_gro_files")
-    molecules: Molecule = Relationship(back_populates="gromacs_gro_files", link_table="molecules_gro")
+    # Relationships: file, molecule
+    files: File = Relationship(back_populates="topology_file")
+    molecules: Molecule = Relationship(back_populates="topology_file", link_table="molecules_gro") # CHECK THIS
     pass
 
-class GromacsMdpFile(SQLModel, table=True):
-    __tablename__ = "gromacs_mdp_files"
+class ParameterFile(SQLModel, table=True):
+    __tablename__ = "parameter_file"
 
-    file_id: int = Field(default=None, primary_key=True, foreign_key="files.id")
+    file_id: int = Field(default=None, primary_key=True, foreign_key="file.id")
     dt: float
     nsteps: int
     temperature: float
@@ -128,33 +133,34 @@ class GromacsMdpFile(SQLModel, table=True):
     barostat: str = Field(index=True)
     integrator: str
 
-    # Relationships: files
-    files: File = Relationship(back_populates="gromacs_mdp_files")
-    thermostat: list[Thermostat] = Relationship(back_populates="gromacs_mdp_files")
-    barostat: list[Barostat] = Relationship(back_populates="gromacs_mdp_files")
-    integrator: list[Integrator] = Relationship(back_populates="gromacs_mdp_files")
-    pass
+    # Relationships: file, thermostat, barostat, integrator
+    file: File = Relationship(back_populates="topology_file")
+    thermostat: Optional[Thermostat] = Relationship(back_populates="parameter_file")
+    barostat: Optional[Barostat] = Relationship(back_populates="parameter_file")
+    integrator: Integrator = Relationship(back_populates="parameter_file")
 
-class GromacsXtcFile(SQLModel, table=True):
-    __tablename__ = "gromacs_xtc_files"
+class TrajectoryFile(SQLModel, table=True):
+    __tablename__ = "trajectory_file"
 
-    file_id: int = Field(default=None, primary_key=True, foreign_key="files.id")
+    file_id: int = Field(default=None, primary_key=True, foreign_key="file.id")
     atom_number: int
     frame_number: int
     
-    # Relationships: files
-    files: File = Relationship(back_populates="gromacs_xtc_files")
-    pass
+    # Relationships: file
+    file: File = Relationship(back_populates="trajectory_file")
 
 ######################
 ### "Types" Tables ###
 ######################
 
 class FileType(SQLModel, table=True):
-    __tablename__ = "file_types"
+    __tablename__ = "file_type"
 
     file_type_id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
+
+    # Relationships: file
+    file: List[File] = Relationship(back_populates="file")
 
 class MoleculeType(SQLModel, table=True):
     __tablename__ = "molecule_types"
@@ -162,35 +168,62 @@ class MoleculeType(SQLModel, table=True):
     molecule_type_id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
 
+    # Relationships: molecule
+    molecule: List[Molecule] = Relationship(back_populates="molecule_type")
+
 class Database(SQLModel, table=True):
     __tablename__ = "databases"
 
     database_id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
 
+    # Relationships: molecule_external_db
+    molecule_external_db: List[MoleculeExternalDb] = Relationship(back_populates="database")
+
+class DatasetOrigin(SQLModel, table=True):
+    __tablename__ = "dataset_origin"
+
+    origin_id: int = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+    # Relationships: dataset
+    dataset: List[Dataset] = Relationship(back_populates="origin")
+
 class Software(SQLModel, table=True):
-    __tablename__ = "softwares"
+    __tablename__ = "software"
 
     software_id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
 
+    # Relationships: file
+    file: List[File] = Relationship(back_populates="software")
+
 class Thermostat(SQLModel, table=True):
-    __tablename__ = "thermostats"
+    __tablename__ = "thermostat"
 
     thermostat_id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
 
+    # Relationships: parameter_file
+    parameter_files: List[ParameterFile] = Relationship(back_populates="thermostat")
+
 class Barostat(SQLModel, table=True):
-    __tablename__ = "barostats"
+    __tablename__ = "barostat"
 
     barostat_id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
 
+    # Relationships: parameter_file
+    parameter_files: List[ParameterFile] = Relationship(back_populates="barostat")
+
 class Integrator(SQLModel, table=True):
-    __tablename__ = "integrators"
+    __tablename__ = "integrator"
 
     integrator_id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
+
+    # Relationships: parameter_file
+    parameter_files: List[ParameterFile] = Relationship(back_populates="integrator")
 
 ######################################
 ### Many-to-Many (MtM) Link Tables ###
