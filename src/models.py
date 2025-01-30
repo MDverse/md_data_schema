@@ -1,4 +1,5 @@
 # Imports
+from __future__ import annotations
 from typing import Optional
 from sqlmodel import Field, Relationship, SQLModel, create_engine
 from datetime import datetime
@@ -26,9 +27,9 @@ class Dataset(SQLModel, table=True):
 
 
     # Relationships: files, authors, molecules
-    files: list["File"] = Relationship(back_populates="datasets")
-    authors: list["Author"] = Relationship(back_populates="datasets", link_table="datasets_authors")
-    molecules: list["Molecule"] = Relationship(back_populates="datasets", link_table="datasets_molecules")
+    files: list[File] = Relationship(back_populates="datasets")
+    authors: list[Author] = Relationship(back_populates="datasets", link_table="datasets_authors")
+    molecules: list[Molecule] = Relationship(back_populates="datasets", link_table="datasets_molecules")
 
 class File(SQLModel, table=True):
     __tablename__ = "files"
@@ -45,13 +46,15 @@ class File(SQLModel, table=True):
 
 
     # Relationships: datasets, files, gromacs_gro_files, gromacs_mdp_files, gromacs_xtc_files
-    files: list["File"] = Relationship(back_populates="files")
-    zip_files: list["File"] = Relationship(back_populates="files") 
+    files: list[File] = Relationship(back_populates="files")
+    zip_files: list[File] = Relationship(back_populates="files") 
 
     datasets: Dataset = Relationship(back_populates="files")
-    gromacs_gro_files: list["GromacsGroFile"] = Relationship(back_populates="files")
-    gromacs_mdp_files: list["GromacsMdpFile"] = Relationship(back_populates="files")
-    gromacs_xtc_files: list["GromacsXtcFile"] = Relationship(back_populates="files")
+    gromacs_gro_files: list[GromacsGroFile] = Relationship(back_populates="files")
+    gromacs_mdp_files: list[GromacsMdpFile] = Relationship(back_populates="files")
+    gromacs_xtc_files: list[GromacsXtcFile] = Relationship(back_populates="files")
+
+    softwares: list[Software] = Relationship(back_populates="files")
     pass
 
 class Author(SQLModel, table=True):
@@ -76,8 +79,8 @@ class Molecule(SQLModel, table=True):
 
     # Relationships: datasets, gromacs_gro_files, molecules_external_db
     datasets: list[Dataset] = Relationship(back_populates="molecules", link_table="datasets_molecules")
-    gromacs_gro_files: list["GromacsGroFile"] = Relationship(back_populates="molecules", link_table="molecules_gro")
-    molecules_external_db: list["MoleculeExternalDb"] = Relationship(back_populates="molecules")
+    gromacs_gro_files: list[GromacsGroFile] = Relationship(back_populates="molecules", link_table="molecules_gro")
+    molecules_external_db: list[MoleculeExternalDb] = Relationship(back_populates="molecules")
     pass
 
 class MoleculeExternalDb(SQLModel, table=True):
@@ -127,6 +130,9 @@ class GromacsMdpFile(SQLModel, table=True):
 
     # Relationships: files
     files: File = Relationship(back_populates="gromacs_mdp_files")
+    thermostat: list[Thermostat] = Relationship(back_populates="gromacs_mdp_files")
+    barostat: list[Barostat] = Relationship(back_populates="gromacs_mdp_files")
+    integrator: list[Integrator] = Relationship(back_populates="gromacs_mdp_files")
     pass
 
 class GromacsXtcFile(SQLModel, table=True):
@@ -160,6 +166,30 @@ class Database(SQLModel, table=True):
     __tablename__ = "databases"
 
     database_id: int = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+class Software(SQLModel, table=True):
+    __tablename__ = "softwares"
+
+    software_id: int = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+class Thermostat(SQLModel, table=True):
+    __tablename__ = "thermostats"
+
+    thermostat_id: int = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+class Barostat(SQLModel, table=True):
+    __tablename__ = "barostats"
+
+    barostat_id: int = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+class Integrator(SQLModel, table=True):
+    __tablename__ = "integrators"
+
+    integrator_id: int = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
 
 ######################################
