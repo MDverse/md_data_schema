@@ -2,44 +2,35 @@
 
 ```mermaid
     erDiagram
-        AUTHOR ||--|{ DATASET_AUTHOR : publishes
-        
-        DATASET ||--|{ FILE : contains
-        DATASET ||--|{ DATASET_AUTHOR : is_published_by
-        DATASET ||--o{ DATASET_MOLECULE : contains
-        DATASET }|--|| DATASET_ORIGIN : ""
+        authors ||--|{ datasets_authors : ""
+        datasets ||--|{ files : ""
+        datasets ||--|{ datasets_authors : ""
+        datasets ||--o{ datasets_molecules : ""
+        datasets }|--|| dataset_origins : ""
+        files }|--o| files : ""
+        files }|--|| file_types : ""
+        files }|--o| software : ""
+        files ||--o| topology_files : ""
+        files ||--o| parameter_files : ""
+        files ||--o| trajectory_files : ""
+        topology_files ||--|{ molecules_topologies : ""
+        parameter_files }|--o| thermostats : ""
+        parameter_files }|--o| barostats : ""
+        parameter_files }|--|| integrators : ""
+        molecules ||--|{ molecules_topologies : ""
+        molecules ||--|{ datasets_molecules : ""
+        molecules }|--o| molecule_types : ""
+        molecules ||--o{ molecules_external_db : ""
+        molecules_external_db }|--o| databases : ""
 
-        FILE }|--o| FILE : parent_zip_file_id
-        FILE }|--|| FILE_TYPE : found
-        FILE }|--o| SOFTWARE : ""
-        FILE ||--o| TOPOLOGY_FILE : ""
-        FILE ||--o| PARAMETER_FILE : ""
-        FILE ||--o| TRAJECTORY_FILE : ""
-
-        TOPOLOGY_FILE ||--|{ MOLECULE_TOPOLOGY : ""
-        
-        PARAMETER_FILE }|--o| THERMOSTAT : ""
-        PARAMETER_FILE }|--o| BAROSTAT : ""
-        PARAMETER_FILE }|--|| INTEGRATOR : ""
-
-        MOLECULE ||--|{ MOLECULE_TOPOLOGY : ""
-        MOLECULE ||--|{ DATASET_MOLECULE : belongs_to
-        MOLECULE }|--o| MOLECULE_TYPE : is_considered_as
-        MOLECULE ||--o{ MOLECULE_EXTERNAL_DB : found_in
-
-        MOLECULE_EXTERNAL_DB }|--o| DATABASE : source
-
-        
-
-        AUTHOR {
+        authors {
             int author_id PK
             str name
             int orcid UK
         }
-
-        DATASET {
+        datasets {
             int dataset_id PK
-            str origin
+            int origin_id FK
             str id_in_origin
             str doi
             datetime date_created
@@ -56,8 +47,7 @@
             str description
             int molecule_id FK
         }
-
-        FILE {
+        files {
             int file_id PK
             int dataset_id FK
             str name
@@ -66,10 +56,9 @@
             str md5
             str url
             bool is_from_zip_file
-            int from_zip_file_id FK
+            int parent_zip_file_id FK
         }
-
-        TOPOLOGY_FILE {
+        topology_files {
             int file_id PK, FK
             int atom_number
             bool has_protein
@@ -79,7 +68,7 @@
             bool has_water_ion
             int molecule_id FK
         }
-        PARAMETER_FILE {
+        parameter_files {
             int file_id PK, FK
             float dt
             int nsteps
@@ -88,60 +77,53 @@
             str barostat
             str integrator
         }
-        TRAJECTORY_FILE {
+        trajectory_files {
             int file_id PK, FK
             int atom_number
             int frame_number
         }
-
-        MOLECULE {
+        molecules {
             int molecule_id PK
             str name
             str formula
             str sequence
             int molecule_type_id FK
         }
-
-        MOLECULE_EXTERNAL_DB {
+        molecules_external_db {
             int molecule_external_db_id PK
             int molecule_id FK
             int database_id FK
             str id_in_db
         }
-
-        DATASET_ORIGIN {
+        dataset_origins {
             int origin_id PK
             str name UK
         }
-
-        DATABASE {
+        databases {
             int database_id PK
             str name UK
         }
-
-        SOFTWARE {
+        software {
             int software_id PK
             str name UK
         }
-        FILE_TYPE {
+        file_types {
             int file_type_id PK
             str format_name UK
         }
-
-        MOLECULE_TYPE {
+        molecule_types {
             int molecule_type_id PK
             str name UK
         }
-
-        BAROSTAT {
+        barostats {
             int barostat_id PK
             str name UK
         }
-        THERMOSTAT {
+        thermostats {
             int thermostat_id PK
             str name UK
         }
-        INTEGRATOR {
+        integrators {
             int integrator_id PK
             str name UK
         }
