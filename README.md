@@ -73,7 +73,7 @@ uv run -m src.app
 
 Because this is a larger project with a **Python package** and not a single Python file, we **cannot** call it just by passing a single file name like in the example below:
 ```sh
-uv run app.py
+uv run src/app.py
 ```
 Instead, we have to tell Python that we want it to execute a **module** that is part of a package:
 ```sh
