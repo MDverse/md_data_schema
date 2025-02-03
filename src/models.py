@@ -16,12 +16,29 @@ This is done to ensure that the table name is in snake_case and plural form, whi
 """
 
 #=============================================================================
-# 
+# Many-to-Many (MtM) Link Tables
 #=============================================================================
-######################################
-### Many-to-Many (MtM) Link Tables ###
-######################################
 
+"""
+Many to Many (MtM) relationships are represented using link tables in SQL databases.
+These tables contain foreign keys to the primary keys of the tables that are related.
+
+The link tables are named using the following convention:
+- Class naming: Class1Class2Link
+- Table naming: table1_table2_link
+
+In the SQLModel documentation, these tables are referred to as "link tables".
+However, in the context of SQL databases, these tables are also known by other names:
+- association table
+- secondary table
+- junction table
+- intermediate table
+- join table
+- through table
+- relationship table
+- connection table
+- cross-reference table
+"""
 
 class DatasetAuthorLink(SQLModel, table=True):
     """
@@ -55,6 +72,15 @@ class MoleculeTopologyLink(SQLModel, table=True):
     molecule_id: Optional[int] = Field(default=None, foreign_key="molecules.molecule_id", primary_key=True)
     file_id: Optional[int] = Field(default=None, foreign_key="topology_files.file_id", primary_key=True)
 
+#=============================================================================
+# Main Tables
+#=============================================================================
+
+"""
+Here we define the main tables of the database schema.
+By "main tables" we mean the tables that represent the main entities in the database.
+These tables are the ones that have the most attributes and relationships with other tables.
+"""
 
 class Dataset(SQLModel, table=True):
     __tablename__ = "datasets"
@@ -94,6 +120,7 @@ class Dataset(SQLModel, table=True):
 class File(SQLModel, table=True):
     __tablename__ = "files"
 
+    # Attributes/Table columns -------------------------------------------------------
     file_id: Optional[int] = Field(default=None, primary_key=True)
     dataset_id: int = Field(foreign_key="datasets.dataset_id")
     name : str
@@ -125,6 +152,7 @@ class File(SQLModel, table=True):
 class Author(SQLModel, table=True):
     __tablename__ = "authors"
 
+    # Attributes/Table columns -------------------------------------------------------
     author_id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     orcid: Optional[int] = Field(default=None, unique=True)
@@ -136,12 +164,15 @@ class Author(SQLModel, table=True):
 class Molecule(SQLModel, table=True):
     __tablename__ = "molecules"
 
+    # Attributes/Table columns -------------------------------------------------------
     molecule_id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     formula: str
     sequence: str
 
-    # Relationships: datasets, topology_files, molecules_external_db, molecule_types
+    # Relationships: datasets, topology_files, molecules_external_db, molecule_types -
+
+
     dataset: List[Dataset] = Relationship(back_populates="molecule", link_model=DatasetMoleculeLink)
     topolgy_file: List[TopologyFile] = Relationship(back_populates="molecule", link_model=MoleculeTopologyLink)
     molecule_external_db: Optional[List[MoleculeExternalDb]] = Relationship(back_populates="molecule")
@@ -151,20 +182,33 @@ class Molecule(SQLModel, table=True):
 class MoleculeExternalDb(SQLModel, table=True):
     __tablename__ = "molecules_external_db"
 
+    # Attributes/Table columns -------------------------------------------------------
     molecule_external_db_id: Optional[int] = Field(default=None, primary_key=True)
     molecule_id: int = Field(foreign_key="molecules.molecule_id")
     db_name: str = Field(index=True)
     id_in_db: str
 
-    # Relationships: molecules, databases
+    # Relationships: molecules, databases --------------------------------------------
+
+
     molecule: Molecule = Relationship(back_populates="molecule_external_db")
     database: Optional[Database] = Relationship(back_populates="molecule_external_db")
 
+#=============================================================================
+# Simulation Files Tables
+#=============================================================================
 
-################################
-### Gromacs Specific Classes ###
-################################
+"""
+These tables correspond to the files that are used in molecular simulations.
+The tables are named after the file types that are used in molecular simulations:
+- Topology files
+- Parameter files
+- Trajectory files
 
+These tables have a one-to-one relationship with the `Files` table. 
+This means that each record in these tables corresponds to exactly one record in the `Files` table. 
+This is why in these tables, the `file_id` is both the primary key and a foreign key.
+"""
 
 class TopologyFile(SQLModel, table=True):
     __tablename__ = "topology_files"
@@ -212,11 +256,15 @@ class TrajectoryFile(SQLModel, table=True):
     # Relationships: files
     file: File = Relationship(back_populates="trajectory_file")
 
+#=============================================================================
+# "Type" Tables
+#=============================================================================
 
-######################
-### "Types" Tables ###
-######################
-
+"""
+These tables are used to store the different types of entities that are used in the database.
+For example, the different types of files that are used in molecular simulations, the different types of molecules, etc.
+These tables have a one-to-many relationship with the main tables.
+"""
 
 class FileType(SQLModel, table=True):
     __tablename__ = "file_types"
