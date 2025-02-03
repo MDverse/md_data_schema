@@ -1,0 +1,315 @@
+2025-02-03 11:49:09,866 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-02-03 11:49:09,866 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("datasets_authors")
+2025-02-03 11:49:09,867 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,867 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("datasets_authors")
+2025-02-03 11:49:09,867 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,867 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("datasets_molecules")
+2025-02-03 11:49:09,867 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,867 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("datasets_molecules")
+2025-02-03 11:49:09,867 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("molecules_topologies")
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("molecules_topologies")
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("datasets")
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("datasets")
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("files")
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("files")
+2025-02-03 11:49:09,868 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("authors")
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("authors")
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("molecules")
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("molecules")
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("molecules_external_db")
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,869 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("molecules_external_db")
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("topology_files")
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("topology_files")
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("parameter_files")
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("parameter_files")
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("trajectory_files")
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("trajectory_files")
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("file_types")
+2025-02-03 11:49:09,870 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("file_types")
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("molecule_types")
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("molecule_types")
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("databases")
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("databases")
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("dataset_origins")
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("dataset_origins")
+2025-02-03 11:49:09,871 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("software")
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("software")
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("thermostats")
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("thermostats")
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("barostats")
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("barostats")
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("integrators")
+2025-02-03 11:49:09,872 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,873 INFO sqlalchemy.engine.Engine PRAGMA temp.table_info("integrators")
+2025-02-03 11:49:09,873 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-02-03 11:49:09,873 INFO sqlalchemy.engine.Engine 
+CREATE TABLE authors (
+        author_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        orcid INTEGER, 
+        PRIMARY KEY (author_id), 
+        UNIQUE (orcid)
+)
+
+
+2025-02-03 11:49:09,873 INFO sqlalchemy.engine.Engine [no key 0.00007s] ()
+2025-02-03 11:49:09,878 INFO sqlalchemy.engine.Engine 
+CREATE TABLE molecules (
+        molecule_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        formula VARCHAR NOT NULL, 
+        sequence VARCHAR NOT NULL, 
+        PRIMARY KEY (molecule_id)
+)
+
+
+2025-02-03 11:49:09,878 INFO sqlalchemy.engine.Engine [no key 0.00011s] ()
+2025-02-03 11:49:09,881 INFO sqlalchemy.engine.Engine 
+CREATE TABLE file_types (
+        file_type_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        PRIMARY KEY (file_type_id), 
+        UNIQUE (name)
+)
+
+
+2025-02-03 11:49:09,881 INFO sqlalchemy.engine.Engine [no key 0.00011s] ()
+2025-02-03 11:49:09,883 INFO sqlalchemy.engine.Engine 
+CREATE TABLE molecule_types (
+        molecule_type_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        PRIMARY KEY (molecule_type_id), 
+        UNIQUE (name)
+)
+
+
+2025-02-03 11:49:09,883 INFO sqlalchemy.engine.Engine [no key 0.00011s] ()
+2025-02-03 11:49:09,885 INFO sqlalchemy.engine.Engine 
+CREATE TABLE databases (
+        database_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        PRIMARY KEY (database_id), 
+        UNIQUE (name)
+)
+
+
+2025-02-03 11:49:09,885 INFO sqlalchemy.engine.Engine [no key 0.00011s] ()
+2025-02-03 11:49:09,887 INFO sqlalchemy.engine.Engine 
+CREATE TABLE dataset_origins (
+        origin_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        PRIMARY KEY (origin_id), 
+        UNIQUE (name)
+)
+
+
+2025-02-03 11:49:09,887 INFO sqlalchemy.engine.Engine [no key 0.00010s] ()
+2025-02-03 11:49:09,889 INFO sqlalchemy.engine.Engine 
+CREATE TABLE software (
+        software_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        PRIMARY KEY (software_id), 
+        UNIQUE (name)
+)
+
+
+2025-02-03 11:49:09,889 INFO sqlalchemy.engine.Engine [no key 0.00009s] ()
+2025-02-03 11:49:09,891 INFO sqlalchemy.engine.Engine 
+CREATE TABLE thermostats (
+        thermostat_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        PRIMARY KEY (thermostat_id), 
+        UNIQUE (name)
+)
+
+
+2025-02-03 11:49:09,891 INFO sqlalchemy.engine.Engine [no key 0.00010s] ()
+2025-02-03 11:49:09,893 INFO sqlalchemy.engine.Engine 
+CREATE TABLE barostats (
+        barostat_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        PRIMARY KEY (barostat_id), 
+        UNIQUE (name)
+)
+
+
+2025-02-03 11:49:09,893 INFO sqlalchemy.engine.Engine [no key 0.00009s] ()
+2025-02-03 11:49:09,897 INFO sqlalchemy.engine.Engine 
+CREATE TABLE integrators (
+        integrator_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        PRIMARY KEY (integrator_id), 
+        UNIQUE (name)
+)
+
+
+2025-02-03 11:49:09,898 INFO sqlalchemy.engine.Engine [no key 0.00011s] ()
+2025-02-03 11:49:09,900 INFO sqlalchemy.engine.Engine 
+CREATE TABLE datasets (
+        dataset_id INTEGER NOT NULL, 
+        origin_id INTEGER NOT NULL, 
+        id_in_origin VARCHAR NOT NULL, 
+        doi VARCHAR NOT NULL, 
+        date_created DATETIME NOT NULL, 
+        date_last_modified DATETIME NOT NULL, 
+        date_last_crawled DATETIME NOT NULL, 
+        file_number INTEGER NOT NULL, 
+        download_number INTEGER NOT NULL, 
+        view_number INTEGER NOT NULL, 
+        license VARCHAR NOT NULL, 
+        url VARCHAR NOT NULL, 
+        title VARCHAR NOT NULL, 
+        author_id INTEGER NOT NULL, 
+        keywords VARCHAR, 
+        description VARCHAR, 
+        molecule_id INTEGER, 
+        PRIMARY KEY (dataset_id), 
+        FOREIGN KEY(origin_id) REFERENCES dataset_origins (origin_id), 
+        FOREIGN KEY(author_id) REFERENCES authors (author_id), 
+        FOREIGN KEY(molecule_id) REFERENCES molecules (molecule_id)
+)
+
+
+2025-02-03 11:49:09,900 INFO sqlalchemy.engine.Engine [no key 0.00009s] ()
+2025-02-03 11:49:09,902 INFO sqlalchemy.engine.Engine 
+CREATE TABLE molecules_external_db (
+        molecule_external_db_id INTEGER NOT NULL, 
+        molecule_id INTEGER NOT NULL, 
+        db_name VARCHAR NOT NULL, 
+        id_in_db VARCHAR NOT NULL, 
+        PRIMARY KEY (molecule_external_db_id), 
+        FOREIGN KEY(molecule_id) REFERENCES molecules (molecule_id)
+)
+
+
+2025-02-03 11:49:09,902 INFO sqlalchemy.engine.Engine [no key 0.00012s] ()
+2025-02-03 11:49:09,904 INFO sqlalchemy.engine.Engine CREATE INDEX ix_molecules_external_db_db_name ON molecules_external_db (db_name)
+2025-02-03 11:49:09,904 INFO sqlalchemy.engine.Engine [no key 0.00010s] ()
+2025-02-03 11:49:09,906 INFO sqlalchemy.engine.Engine 
+CREATE TABLE datasets_authors (
+        dataset_id INTEGER NOT NULL, 
+        author_id INTEGER NOT NULL, 
+        PRIMARY KEY (dataset_id, author_id), 
+        FOREIGN KEY(dataset_id) REFERENCES datasets (dataset_id), 
+        FOREIGN KEY(author_id) REFERENCES authors (author_id)
+)
+
+
+2025-02-03 11:49:09,906 INFO sqlalchemy.engine.Engine [no key 0.00009s] ()
+2025-02-03 11:49:09,908 INFO sqlalchemy.engine.Engine 
+CREATE TABLE datasets_molecules (
+        dataset_id INTEGER NOT NULL, 
+        molecule_id INTEGER NOT NULL, 
+        PRIMARY KEY (dataset_id, molecule_id), 
+        FOREIGN KEY(dataset_id) REFERENCES datasets (dataset_id), 
+        FOREIGN KEY(molecule_id) REFERENCES molecules (molecule_id)
+)
+
+
+2025-02-03 11:49:09,908 INFO sqlalchemy.engine.Engine [no key 0.00010s] ()
+2025-02-03 11:49:09,911 INFO sqlalchemy.engine.Engine 
+CREATE TABLE files (
+        file_id INTEGER NOT NULL, 
+        dataset_id INTEGER NOT NULL, 
+        name VARCHAR NOT NULL, 
+        file_type_id INTEGER NOT NULL, 
+        size_in_bytes INTEGER NOT NULL, 
+        md5 VARCHAR NOT NULL, 
+        url VARCHAR NOT NULL, 
+        is_from_zip_file BOOLEAN NOT NULL, 
+        parent_zip_file_id INTEGER, 
+        PRIMARY KEY (file_id), 
+        FOREIGN KEY(dataset_id) REFERENCES datasets (dataset_id), 
+        FOREIGN KEY(file_type_id) REFERENCES file_types (file_type_id), 
+        FOREIGN KEY(parent_zip_file_id) REFERENCES files (file_id)
+)
+
+
+2025-02-03 11:49:09,912 INFO sqlalchemy.engine.Engine [no key 0.00011s] ()
+2025-02-03 11:49:09,913 INFO sqlalchemy.engine.Engine CREATE INDEX ix_files_is_from_zip_file ON files (is_from_zip_file)
+2025-02-03 11:49:09,913 INFO sqlalchemy.engine.Engine [no key 0.00007s] ()
+2025-02-03 11:49:09,916 INFO sqlalchemy.engine.Engine 
+CREATE TABLE topology_files (
+        file_id INTEGER NOT NULL, 
+        atom_number INTEGER NOT NULL, 
+        has_protein BOOLEAN NOT NULL, 
+        has_nucleic BOOLEAN NOT NULL, 
+        has_lipid BOOLEAN NOT NULL, 
+        has_glucid BOOLEAN NOT NULL, 
+        has_water_ion BOOLEAN NOT NULL, 
+        molecule_id INTEGER NOT NULL, 
+        PRIMARY KEY (file_id), 
+        FOREIGN KEY(file_id) REFERENCES files (file_id), 
+        FOREIGN KEY(molecule_id) REFERENCES molecules (molecule_id)
+)
+
+
+2025-02-03 11:49:09,916 INFO sqlalchemy.engine.Engine [no key 0.00012s] ()
+2025-02-03 11:49:09,918 INFO sqlalchemy.engine.Engine 
+CREATE TABLE parameter_files (
+        file_id INTEGER NOT NULL, 
+        dt FLOAT NOT NULL, 
+        nsteps INTEGER NOT NULL, 
+        temperature FLOAT NOT NULL, 
+        PRIMARY KEY (file_id), 
+        FOREIGN KEY(file_id) REFERENCES files (file_id)
+)
+
+
+2025-02-03 11:49:09,918 INFO sqlalchemy.engine.Engine [no key 0.00008s] ()
+2025-02-03 11:49:09,919 INFO sqlalchemy.engine.Engine 
+CREATE TABLE trajectory_files (
+        file_id INTEGER NOT NULL, 
+        atom_number INTEGER NOT NULL, 
+        frame_number INTEGER NOT NULL, 
+        PRIMARY KEY (file_id), 
+        FOREIGN KEY(file_id) REFERENCES files (file_id)
+)
+
+
+2025-02-03 11:49:09,919 INFO sqlalchemy.engine.Engine [no key 0.00008s] ()
+2025-02-03 11:49:09,921 INFO sqlalchemy.engine.Engine 
+CREATE TABLE molecules_topologies (
+        molecule_id INTEGER NOT NULL, 
+        file_id INTEGER NOT NULL, 
+        PRIMARY KEY (molecule_id, file_id), 
+        FOREIGN KEY(molecule_id) REFERENCES molecules (molecule_id), 
+        FOREIGN KEY(file_id) REFERENCES topology_files (file_id)
+)
+
+
+2025-02-03 11:49:09,922 INFO sqlalchemy.engine.Engine [no key 0.00010s] ()
+2025-02-03 11:49:09,923 INFO sqlalchemy.engine.Engine COMMIT
