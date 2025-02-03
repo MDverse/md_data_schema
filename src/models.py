@@ -294,14 +294,3 @@ class Integrator(SQLModel, table=True):
 
     # Relationships: parameter_files
     parameter_file: List[ParameterFile] = Relationship(back_populates="integrator")
-
-
-
-
-
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-
-engine = create_engine(sqlite_url, echo=True)
-
-SQLModel.metadata.create_all(engine)
