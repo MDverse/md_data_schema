@@ -16,6 +16,7 @@ dependencies = [
 line-length = 88
 
 [tool.ruff.lint]
+# Ruff rules: https://docs.astral.sh/ruff/rules/
 select = [
     "F",    # pyflakes
     "E",    # pycodestyle Error
