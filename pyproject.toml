@@ -12,8 +12,21 @@ dependencies = [
 ]
 
 [tool.ruff]
-# Set the maximum line length to 79.
-line-length = 79
+# Set the maximum line length to 88, like Black.
+line-length = 88
 
 [tool.ruff.lint]
-extend-select = ["E", "W"]
+select = [
+    "F",    # pyflakes
+    "E",    # pycodestyle Error
+    "W",    # pycodestle Warning
+    "I",    # isort
+    "B",    # bugbear
+    "C90",  # mccabe
+    "N",    # pep8-naming
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 79
+
