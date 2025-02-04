@@ -6,5 +6,13 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.7",
+    "ruff>=0.9.4",
     "sqlmodel>=0.0.22",
 ]
+
+[tool.ruff]
+# Set the maximum line length to 79.
+line-length = 79
+
+[tool.ruff.lint]
+extend-select = ["E", "W"]
