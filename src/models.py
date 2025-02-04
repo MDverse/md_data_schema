@@ -391,7 +391,6 @@ class DatasetOrigin(SQLModel, table=True):
 
     origin_id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
-    id_in_origin: str
 
     # Relationships: datasets
     dataset: list[Dataset] = Relationship(back_populates="origin")
