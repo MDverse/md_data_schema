@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.7",
+    "pandas>=2.2.3",
     "ruff>=0.9.4",
     "sqlmodel>=0.0.22",
 ]
@@ -28,3 +29,4 @@ select = [
 [tool.ruff.format]
 docstring-code-format = true
 docstring-code-line-length = 79
+

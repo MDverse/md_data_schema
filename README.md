@@ -4,46 +4,9 @@
 
 For this project, we will be using **UV** to create and manage our environments.
 
-### Why UV and not Conda?
-1. **Speed** – UV is significantly faster than Conda for package installation and dependency resolution.
-2. **Lightweight** – Unlike Conda, UV does not require a separate package manager and works efficiently with `pyproject.toml` (configuration file used to define dependencies, build system settings, and project metadata).
-3. **Better Dependency Management** – UV offers improved dependency resolution and reproducibility compared to Conda.
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
-For more details, visit the **[UV Documentation](https://astral.sh/uv/)**.
-
----
-
-## A) How to install UV
-
-### **On macOS and Linux:**
-```sh
-curl -LSsf https://astral.sh/uv/install.sh | sh
-```
-
-### **On Windows:**
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-### **Or install from PyPI:**
-```sh
-# Using pip
-pip install uv
-
-# Using pipx
-pipx install uv
-```
-
-After installation, you can update UV with:
-```sh
-uv self update
-```
-
-For more installation details, check the [UV GitHub page](https://github.com/astral-sh/uv).
-
----
-
-## B) Clone the Git Repository
+## A) Clone the git repository
 
 ```sh
 git clone git@github.com:MDverse/md_data_schema.git
@@ -52,7 +15,7 @@ cd md_data_schema
 
 ---
 
-## C) Sync Dependencies
+## B) Sync dependencies
 
 Once inside the repository, sync the environment with:
 ```sh
@@ -85,7 +48,7 @@ This ensures Python correctly resolves dependencies and imports.
 Using `uv run` instead of `python` ensures that the command runs within the **UV-managed environment**, preventing conflicts with global Python installations and ensuring dependency consistency.
 
 
-# 3) Visualizing the Database
+# 3) Visualizing the database
 
 To explore the database visually, you can use **SQLite Browser**. Run the following command in your terminal:
 ```sh

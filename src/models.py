@@ -1,6 +1,6 @@
 # Imports
-from __future__ import annotations
-from typing import Optional, List
+
+from typing import Optional
 from sqlmodel import Field, Relationship, SQLModel
 from datetime import datetime
 
@@ -21,6 +21,15 @@ Since we are using python syntax, it is important to note that:
 We explicitly define the table name using the __tablename__ attribute.
 This is done to ensure that the table name is in snake_case and plural form,
 which is the convention in SQL databases (DBs).
+
+Due to incompatibility issues between:
+- SQLModel
+- SQLAlchemy (that creates the engine for the database)
+We will be writing the code without:
+- using the "from __future__ import annotations" syntax
+- using the "from typing import List" syntax
+Therefore we will also be sure to use 'list["ClassName"]' or 'ClassName' when
+defining certain relationships.
 """
 
 # ============================================================================
@@ -29,7 +38,7 @@ which is the convention in SQL databases (DBs).
 
 """
 Many to Many (MtM) relationships are represented using link tables in SQL DBs.
-These tables contain FK to the primary keys of the tables that are related.
+These tables contain FKs to the PKs of the tables that are related.
 
 The link tables are named using the following convention:
 - Class naming: Class1Class2Link
@@ -46,8 +55,9 @@ However, in the context of SQL DBs, these tables are also known as:
 - relationship table
 - connection table
 - cross-reference table
+We will be using the term "link table" for coherence with the SQLModel doc.
 
-Link tables are always initialized at the beginning of the schema definition.
+Link tables/classes are always initialized at the beginning of the models.
 This is necessary because, even with "from __future__ import annotations",
 the class won't be recognized if "link_model = Class1Class2Link" is
 used BEFORE the class is declared.
@@ -145,13 +155,13 @@ class Dataset(SQLModel, table=True):
 
     # A dataset can have many files, authors, and molecules
     # (although it can have zero molecules)
-    # A dataset can have only one origin (not a List)
-    file: List[File] = Relationship(back_populates="dataset")
-    origin: DatasetOrigin = Relationship(back_populates="dataset")
-    author: List[Author] = Relationship(
+    # A dataset can have only one origin (not a list)
+    file: list["File"] = Relationship(back_populates="dataset")
+    origin: "DatasetOrigin" = Relationship(back_populates="dataset")
+    author: list["Author"] = Relationship(
         back_populates="dataset", link_model=DatasetAuthorLink
     )
-    molecule: Optional[List[Molecule]] = Relationship(
+    molecule: Optional[list["Molecule"]] = Relationship(
         back_populates="dataset", link_model=DatasetMoleculeLink
     )
 
@@ -167,6 +177,7 @@ class File(SQLModel, table=True):
     size_in_bytes: int
     md5: str
     url: str
+    software_id: Optional[int] = Field(foreign_key="software.software_id")
     is_from_zip_file: bool = Field(index=True)
     parent_zip_file_id: Optional[int] = Field(
         # notice the lowercase "f" to refer to the database table name
@@ -178,21 +189,21 @@ class File(SQLModel, table=True):
     # Relationships: datasets, files, topology_files, parameter_files, -------
     # trajectory_files, software, file_types
 
-    parent: Optional[File] = Relationship(
+    parent: Optional["File"] = Relationship(
         back_populates="children",
         sa_relationship_kwargs=dict(remote_side="File.file_id"),
     )  # notice the uppercase "F" to refer to this table class
-    children: List[File] = Relationship(back_populates="parent")
+    children: list["File"] = Relationship(back_populates="parent")
 
     dataset: Dataset = Relationship(back_populates="file")
-    topology_file: Optional[TopologyFile] = Relationship(
+    topology_file: Optional["TopologyFile"] = Relationship(
         back_populates="file")
-    parameter_file: Optional[ParameterFile] = Relationship(
+    parameter_file: Optional["ParameterFile"] = Relationship(
         back_populates="file")
-    trajectory_file: Optional[TrajectoryFile] = Relationship(
+    trajectory_file: Optional["TrajectoryFile"] = Relationship(
         back_populates="file")
-    softwares: Optional[Software] = Relationship(back_populates="file")
-    file_type: FileType = Relationship(back_populates="file")
+    softwares: Optional["Software"] = Relationship(back_populates="file")
+    file_type: "FileType" = Relationship(back_populates="file")
 
 
 class Author(SQLModel, table=True):
@@ -201,10 +212,10 @@ class Author(SQLModel, table=True):
     # Attributes/Table columns -----------------------------------------------
     author_id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    orcid: Optional[int] = Field(default=None, unique=True)
+    orcid: Optional[str] = Field(default=None, unique=True)
 
     # Relationships: dataset
-    dataset: List[Dataset] = Relationship(
+    dataset: list[Dataset] = Relationship(
         back_populates="author", link_model=DatasetAuthorLink
     )
 
@@ -217,17 +228,20 @@ class Molecule(SQLModel, table=True):
     name: str
     formula: str
     sequence: str
+    molecule_type_id: Optional[int] = Field(
+        foreign_key="molecule_types.molecule_type_id"
+    )
 
     # Relationships: datasets, topology_files, -------------------------------
     # molecules_external_db, molecule_types
 
-    dataset: List[Dataset] = Relationship(
+    dataset: list[Dataset] = Relationship(
         back_populates="molecule", link_model=DatasetMoleculeLink)
-    topolgy_file: List[TopologyFile] = Relationship(
+    topology_file: list["TopologyFile"] = Relationship(
         back_populates="molecule", link_model=MoleculeTopologyLink)
-    mol_ext_db: Optional[List[MoleculeExternalDb]] = Relationship(
+    mol_ext_db: Optional[list["MoleculeExternalDb"]] = Relationship(
         back_populates="molecule")
-    molecule_type: Optional[MoleculeType] = Relationship(
+    molecule_type: Optional["MoleculeType"] = Relationship(
         back_populates="molecule")
 
 
@@ -238,12 +252,13 @@ class MoleculeExternalDb(SQLModel, table=True):
     mol_ext_db_id: Optional[int] = Field(default=None, primary_key=True)
     molecule_id: int = Field(foreign_key="molecules.molecule_id")
     db_name: str = Field(index=True)
-    id_in_db: str
+    id_in_external_db: str
+    database_id: Optional[int] = Field(foreign_key="databases.database_id")
 
     # Relationships: molecules, databases ------------------------------------
 
     molecule: Molecule = Relationship(back_populates="mol_ext_db")
-    database: Optional[Database] = Relationship(back_populates="mol_ext_db")
+    database: Optional["Database"] = Relationship(back_populates="mol_ext_db")
 
 
 # ============================================================================
@@ -281,7 +296,7 @@ class TopologyFile(SQLModel, table=True):
 
     # Relationships: files, molecules
     file: File = Relationship(back_populates="topology_file")
-    molecule: List[Molecule] = Relationship(
+    molecule: list[Molecule] = Relationship(
         back_populates="topology_file", link_model=MoleculeTopologyLink
     )
 
@@ -295,18 +310,18 @@ class ParameterFile(SQLModel, table=True):
     dt: float
     nsteps: int
     temperature: float
-    thermostat: str = Field(index=True)
-    barostat: str = Field(index=True)
-    integrator: str
+    thermostat_id: Optional[int] = Field(foreign_key="thermostats.thermostat_id")
+    barostat_id: Optional[int] = Field(foreign_key="barostats.barostat_id")
+    integrator_id: int = Field(foreign_key="integrators.integrator_id")
 
     # Relationships: files, thermostats, barostats, integrators
     file: File = Relationship(
         back_populates="parameter_file")
-    thermostat: Optional[Thermostat] = Relationship(
+    thermostat: Optional["Thermostat"] = Relationship(
         back_populates="parameter_file")
-    barostat: Optional[Barostat] = Relationship(
+    barostat: Optional["Barostat"] = Relationship(
         back_populates="parameter_file")
-    integrator: Integrator = Relationship(
+    integrator: "Integrator" = Relationship(
         back_populates="parameter_file")
 
 
@@ -346,7 +361,7 @@ class FileType(SQLModel, table=True):
     name: str = Field(unique=True)
 
     # Relationships: files
-    file: List[File] = Relationship(back_populates="file_type")
+    file: list[File] = Relationship(back_populates="file_type")
 
 
 class MoleculeType(SQLModel, table=True):
@@ -356,7 +371,7 @@ class MoleculeType(SQLModel, table=True):
     name: str = Field(unique=True)
 
     # Relationships: molecules
-    molecule: List[Molecule] = Relationship(back_populates="molecule_type")
+    molecule: list[Molecule] = Relationship(back_populates="molecule_type")
 
 
 class Database(SQLModel, table=True):
@@ -366,7 +381,7 @@ class Database(SQLModel, table=True):
     name: str = Field(unique=True)
 
     # Relationships: molecules_external_db
-    mol_ext_db: List[MoleculeExternalDb] = Relationship(
+    mol_ext_db: list[MoleculeExternalDb] = Relationship(
         back_populates="database"
     )
 
@@ -379,7 +394,7 @@ class DatasetOrigin(SQLModel, table=True):
     id_in_origin: str
 
     # Relationships: datasets
-    dataset: List[Dataset] = Relationship(back_populates="origin")
+    dataset: list[Dataset] = Relationship(back_populates="origin")
 
 
 class Software(SQLModel, table=True):
@@ -389,7 +404,7 @@ class Software(SQLModel, table=True):
     name: str = Field(unique=True)
 
     # Relationships: files
-    file: List[File] = Relationship(back_populates="softwares")
+    file: list[File] = Relationship(back_populates="softwares")
 
 
 class Thermostat(SQLModel, table=True):
@@ -399,7 +414,7 @@ class Thermostat(SQLModel, table=True):
     name: str = Field(unique=True)
 
     # Relationships: parameter_files
-    parameter_file: List[ParameterFile] = Relationship(
+    parameter_file: list[ParameterFile] = Relationship(
         back_populates="thermostat")
 
 
@@ -410,7 +425,7 @@ class Barostat(SQLModel, table=True):
     name: str = Field(unique=True)
 
     # Relationships: parameter_files
-    parameter_file: List[ParameterFile] = Relationship(
+    parameter_file: list[ParameterFile] = Relationship(
         back_populates="barostat")
 
 
@@ -421,5 +436,5 @@ class Integrator(SQLModel, table=True):
     name: str = Field(unique=True)
 
     # Relationships: parameter_files
-    parameter_file: List[ParameterFile] = Relationship(
+    parameter_file: list[ParameterFile] = Relationship(
         back_populates="integrator")
