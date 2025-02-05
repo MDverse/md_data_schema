@@ -55,7 +55,7 @@ This will create `.csv` dataframes inside the `data` directory which will be loa
 
 # 4) Creating the database
 
-After retrieving and transforling the data, you can create the databse using:
+After retrieving and transforming the data, you can create the database using:
 
 ```sh
 uv run -m src.app
