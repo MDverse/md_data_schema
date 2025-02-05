@@ -2,7 +2,7 @@
 
 from typing import Optional
 from sqlmodel import Field, Relationship, SQLModel
-from datetime import datetime
+from datetime import datetime, date
 
 # ============================================================================
 
@@ -135,8 +135,8 @@ class Dataset(SQLModel, table=True):
     origin_id: int = Field(foreign_key="dataset_origins.origin_id")
     id_in_origin: str
     doi: str
-    date_created: datetime  # YYYY-MM-DD format
-    date_last_modified: datetime  # YYYY-MM-DD format
+    date_created: date  # YYYY-MM-DD format
+    date_last_modified: date  # YYYY-MM-DD format
     date_last_crawled: datetime  # ("%Y-%m-%dT%H:%M:%S")
     file_number: int = 0
     download_number: int = 0
