@@ -133,15 +133,11 @@ def create_datasets():
     pass
 
 
-def create():
-    pass
-
-
 def main():
     create_db_and_tables()
     create_dataset_origins()
     create_authors()
-    create_datasets()
+    # create_datasets()
 
     create_barostats()
     create_thermostats()
