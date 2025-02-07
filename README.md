@@ -29,7 +29,7 @@ This will install all necessary dependencies from `pyproject.toml`.
 After setting up your environment with `uv`, we're going to need to retrieve data for the database (the parquet files are avaialble on [Zenodo](https://doi.org/10.5281/zenodo.7856523)). For this, you can run the following command:
 
 ```sh
-uv run src/data_retrieval.py
+uv run src/download_data.py
 ```
 The output path has already been specified and will create the directory `data/parquet_files` with the following structure:
 
@@ -48,7 +48,7 @@ data
 After retrieving the data, we will be transforming it into a format that can be loaded into the database.
 
 ```sh
-uv run src/data_cleaning.py
+uv run src/transform_data.py
 ```
 
 This will create `.csv` dataframes inside the `data` directory which will be loaded into the database. 
