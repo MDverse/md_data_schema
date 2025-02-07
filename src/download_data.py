@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import requests
 
 # Zenodo API URL
@@ -9,8 +9,9 @@ ZENODO_API_URL = f"https://zenodo.org/api/records/{ZENODO_RECORD_ID}"
 OUTPUT_FOLDER = "data/parquet_files"
 
 # Ensure the output folder exists (create it if necessary)
-if not os.path.exists(OUTPUT_FOLDER):
-    os.makedirs(OUTPUT_FOLDER)
+output_path = Path(OUTPUT_FOLDER)
+if not output_path.exists():
+    output_path.mkdir(parents=True, exist_ok=True)
     print(f"Created folder: {OUTPUT_FOLDER}\n")
 
 def get_parquet_files():
@@ -31,7 +32,7 @@ def get_parquet_files():
             file_url = file_entry["links"]["self"]
             
             # Define full file path
-            file_path = os.path.join(OUTPUT_FOLDER, filename)
+            file_path = output_path / filename
 
             # Step 3: Download and save each file
             print(f"Downloading {filename} to {OUTPUT_FOLDER}...\n")
