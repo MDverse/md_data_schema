@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import requests
 
 # Zenodo API URL
@@ -16,7 +17,7 @@ if not output_path.exists():
 
 def get_parquet_files():
     """
-    Fetches and downloads all .parquet files 
+    Fetches and downloads all .parquet files
     from Zenodo to a specified folder.
     """
 
@@ -30,7 +31,7 @@ def get_parquet_files():
         filename = file_entry["key"]
         if filename.endswith(".parquet"):  # Filter for .parquet files
             file_url = file_entry["links"]["self"]
-            
+
             # Define full file path
             file_path = output_path / filename
 

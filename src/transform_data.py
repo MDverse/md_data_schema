@@ -1,5 +1,6 @@
 import pandas as pd
-from datetime import datetime, date
+
+# from datetime import datetime, date
 
 # Path to the parquet data files
 mdp_path = "data/parquet_files/gromacs_mdp_files.parquet"
@@ -15,12 +16,7 @@ xtc_data = pd.read_parquet(xtc_path)
 files_data = pd.read_parquet(files_path)
 datasets_data = pd.read_parquet(datasets_path)
 
-
-# ============================================================================
-# Main Tables
-# ============================================================================
-
-# Datasets --------------------------------------------
+# Datasets ===================================================================
 datasets = datasets_data[[
     'dataset_origin',
     'dataset_id',
@@ -61,19 +57,32 @@ datasets = datasets_data[[
             })
 
 # Change date_creation and date_last_modified to datetime.date
-datasets['date_creatd'] = pd.to_datetime(datasets['date_created']).dt.strftime('%Y-%m-%d')
-datasets['date_last_modified'] = pd.to_datetime(datasets['date_last_modified']).dt.strftime('%Y-%m-%d')
+datasets['date_creatd'] = pd.to_datetime(
+    datasets['date_created']
+    ).dt.strftime(
+        '%Y-%m-%d'
+        )
+datasets['date_last_modified'] = pd.to_datetime(
+    datasets['date_last_modified']
+    ).dt.strftime(
+        '%Y-%m-%d'
+        )
 # Change date_last_crawled to datetime
-datasets['date_last_crawled'] = pd.to_datetime(datasets['date_last_crawled']).dt.strftime('%Y-%m-%dT%H:%M:%S')
+datasets['date_last_crawled'] = pd.to_datetime(
+    datasets['date_last_crawled']
+    ).dt.strftime(
+        '%Y-%m-%dT%H:%M:%S'
+        )
 
-# For datasets["author"] column, we can have multiple authors separated by a comma.
-# We need to split the authors but keep them concatenated. We simply need to remove the
-# space after the comma.
+# For datasets["author"] column, we can have multiple authors
+# separated by a comma.
+# We need to split the authors but keep them concatenated.
+# We simply need to remove the space after the comma.
 datasets['author'] = datasets['author'].str.replace(", ", ",")
 
 datasets.to_csv('data/datasets.csv', index=False)
 
-# Files -----------------------------------------------
+# Files ======================================================================
 files = files_data[[
     'file_name',
     'file_size',
@@ -97,76 +106,13 @@ files = files_data[[
             'parent_zip_file_id': str
             })
 
-# files.to_csv('data/files.csv', index=False)
+files.to_csv('data/files.csv', index=False)
 
-# Authors ---------------------------------------------
-
-"""
-For future iterations of the project:
-Currently 05/02/2025, we don'h have the ORCID information in any of the
-MDverse Zenodo datasets. Thus, we add the column and inject None values.
-
-Later on, when the orcid information is available in the parquet datasets,
-it is important to change the data cleaning/sorting process for 'authors' to
-ensure that we have correct ORCIDs.
-"""
-
-"""Process:
-1) Retrieve the "author" column from the 'datasets_data' DataFrame
-2) Rename the column to 'name' and convert the column to string
-3) Add a new column 'orcid' with None values
-4) Drop duplicates based on both the 'name' and 'orcid' columns.
-    Use: We can have multiple people with the John Smith name
-    but with different ORCID values.
-5) Drop rows with missing values in the 'name' column (this column has to
-    be NOT NULL in all cases)
-6) Save the authors DataFrame to a CSV file
-"""
-
-authors = datasets_data[[
-    'author'
-    ]].rename(columns={
-        'author': 'name'
-        }).astype({
-            'name': str
-            })
-authors['orcid'] = None
-authors = authors.drop_duplicates(subset=['name', 'orcid'])
-authors = authors.dropna(subset=["name"])
-
-authors.to_csv('data/authors.csv', index=False)
-
-# Molecules -------------------------------------------
-molecules = pd.DataFrame(columns=[
-    'name',
-    'formula',
-    'sequence'
-    ]).astype({
-        'name': str,
-        'formula': str,
-        'sequence': str
-        })
-
-
-# molecules.to_csv('data/molecules.csv', index=False)
-
-# Molecules External DB -------------------------------
-# Create the molecules_external_db dataset
-molecules_external_db = pd.DataFrame(columns=[
-    'id_in_external_db'
-    ]).astype({
-        'id_in_external_db': str
-        })
-
-# molecules_external_db.to_csv('data/molecules_external_db.csv', index=False)
-
-# ============================================================================
-# Simulation Files Tables
-# ============================================================================
-
-# Topology Files --------------------------------------
+# Topology Files =============================================================
 
 topology_files = gro_data[[
+    'dataset_origin',
+    'dataset_id',
     'file_name',
     'atom_number',
     'has_protein',
@@ -177,6 +123,8 @@ topology_files = gro_data[[
     ]].rename(columns={
         'file_name': 'name'
         }).astype({
+            'dataset_origin': str,
+            'dataset_id': str,
             'name': str,
             'atom_number': int,
             'has_protein': bool,
@@ -186,11 +134,13 @@ topology_files = gro_data[[
             'has_water_ion': bool
             })
 
-# topology_files.to_csv('data/topology_files.csv', index=False)
+topology_files.to_csv('data/topology_files.csv', index=False)
 
-# Parameter Files -------------------------------------
+# Parameter Files ============================================================
 
 parameter_files = mdp_data[[
+    'dataset_origin',
+    'dataset_id',
     'file_name',
     'dt',
     'nsteps',
@@ -198,6 +148,8 @@ parameter_files = mdp_data[[
     ]].rename(columns={
         'file_name': 'name'
         }).astype({
+            'dataset_origin': str,
+            'dataset_id': str,
             'name': str,
             'dt': float,
             'nsteps': float,
@@ -205,105 +157,24 @@ parameter_files = mdp_data[[
             })
 
 
-# parameter_files.to_csv('data/parameter_files.csv', index=False)
+parameter_files.to_csv('data/parameter_files.csv', index=False)
 
-# Trajectory Files ------------------------------------
+# Trajectory Files ===========================================================
 
 trajectory_files = xtc_data[[
+    'dataset_origin',
+    'dataset_id',
     'file_name',
     'atom_number',
     'frame_number'
     ]].rename(columns={
         'file_name': 'name'
         }).astype({
+            'dataset_origin': str,
+            'dataset_id': str,
             'name': str,
             'atom_number': int,
             'frame_number': int
             })
 
-# trajectory_files.to_csv('data/trajectory_files.csv', index=False)
-
-
-
-# ============================================================================
-# "Type" Tables
-# ============================================================================
-
-# Dataset Origins -------------------------------------
-
-dataset_origins = pd.DataFrame(files_data[
-    'dataset_origin'
-    ].unique(), columns=[
-        'name'
-        ])
-
-dataset_origins = dataset_origins.drop_duplicates(subset=['name'])
-dataset_origins = dataset_origins.dropna(subset=["name"])
-
-dataset_origins.to_csv('data/dataset_origins.csv', index=False)
-
-# molecule_types.to_csv('data/molecule_types.csv', index=False)
-
-# File Types -----------------------------------------
-
-file_types = pd.DataFrame(files_data[
-    'file_type'
-    ].unique(), columns=[
-        'name'
-        ])
-
-file_types = file_types.drop_duplicates(subset=['name'])
-file_types = file_types.dropna(subset=['name'])
-
-file_types.to_csv('data/file_types.csv', index=False)
-
-# software.to_csv('data/software.csv', index=False)
-
-# Databases -------------------------------------------
-
-databases = pd.DataFrame(columns=[
-    'name'
-    ]).astype({
-        'name': str
-        })
-
-# databases.to_csv('data/databases.csv', index=False)
-
-# Thermostats -----------------------------------------
-
-thermostats = pd.DataFrame(mdp_data[
-    'thermostat'
-    ].unique(), columns=[
-        'name'
-        ])
-
-thermostats = thermostats.drop_duplicates(subset=['name'])
-thermostats = thermostats.dropna(subset=['name'])
-
-thermostats.to_csv('data/thermostats.csv', index=False)
-
-# Barostats -------------------------------------------
-
-barostats = pd.DataFrame(mdp_data[
-    'barostat'
-    ].unique(), columns=[
-        'name'
-        ])
-
-barostats = barostats.drop_duplicates(subset=['name'])
-barostats = barostats.dropna(subset=['name'])
-
-barostats.to_csv('data/barostats.csv', index=False)
-
-# Integrators ----------------------------------------
-
-integrators = pd.DataFrame(mdp_data[
-    'integrator'
-    ].unique(), columns=[
-        'name'
-        ])
-
-integrators = integrators.drop_duplicates(subset=['name'])
-integrators = integrators.dropna(subset=['name'])
-
-integrators.to_csv('data/integrators.csv', index=False)
+trajectory_files.to_csv('data/trajectory_files.csv', index=False)

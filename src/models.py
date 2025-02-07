@@ -1,8 +1,8 @@
 # Imports
 
 from typing import Optional
+
 from sqlmodel import Field, Relationship, SQLModel
-from datetime import datetime, date
 
 # ============================================================================
 
