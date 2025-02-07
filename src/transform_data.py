@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 
 # Path to the parquet data files
 mdp_path = "data/parquet_files/gromacs_mdp_files.parquet"
@@ -39,14 +39,14 @@ datasets = datasets_data[[
     'description'
     ]].rename(columns={
         'dataset_id': 'id_in_origin',
-        'dataset_creation': 'dataset_created',
+        'date_creation': 'date_created',
         'date_fetched': 'date_last_crawled',
         'dataset_url': 'url'
         }).astype({
             'dataset_origin': str,
             'id_in_origin': str,
             'doi': str,
-            'date_creation': str,
+            'date_created': str,
             'date_last_modified': str,
             'date_last_crawled': str,
             'file_number': int,
@@ -61,10 +61,15 @@ datasets = datasets_data[[
             })
 
 # Change date_creation and date_last_modified to datetime.date
-datasets['date_creation'] = pd.to_datetime(datasets['date_creation']).dt.date
-datasets['date_last_modified'] = pd.to_datetime(datasets['date_last_modified']).dt.date
+datasets['date_creatd'] = pd.to_datetime(datasets['date_created']).dt.strftime('%Y-%m-%d')
+datasets['date_last_modified'] = pd.to_datetime(datasets['date_last_modified']).dt.strftime('%Y-%m-%d')
 # Change date_last_crawled to datetime
-datasets['date_last_crawled'] = pd.to_datetime(datasets['date_last_crawled'])
+datasets['date_last_crawled'] = pd.to_datetime(datasets['date_last_crawled']).dt.strftime('%Y-%m-%dT%H:%M:%S')
+
+# For datasets["author"] column, we can have multiple authors separated by a comma.
+# We need to split the authors but keep them concatenated. We simply need to remove the
+# space after the comma.
+datasets['author'] = datasets['author'].str.replace(", ", ",")
 
 datasets.to_csv('data/datasets.csv', index=False)
 

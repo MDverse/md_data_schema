@@ -134,22 +134,20 @@ class Dataset(SQLModel, table=True):
     dataset_id: Optional[int] = Field(default=None, primary_key=True)
     origin_id: int = Field(foreign_key="dataset_origins.origin_id")
     id_in_origin: str
-    doi: str
-    date_created: date  # YYYY-MM-DD format
-    date_last_modified: date  # YYYY-MM-DD format
-    date_last_crawled: datetime  # ("%Y-%m-%dT%H:%M:%S")
+    doi: Optional[str] = Field(default=None)
+    date_created: str  # YYYY-MM-DD format
+    date_last_modified: str  # YYYY-MM-DD format
+    date_last_crawled: str # ("%Y-%m-%dT%H:%M:%S")
     file_number: int = 0
     download_number: int = 0
     view_number: int = 0
-    license: str
+    license: Optional[str] = Field(default=None)
     url: str
     title: str
-    author_id: int = Field(foreign_key="authors.author_id")
+
     keywords: Optional[str]  # = Field(index=True) ; keywords separated by ";"
     description: Optional[str] = None
-    molecule_id: Optional[int] = Field(
-        default=None, foreign_key="molecules.molecule_id"
-    )
+
 
     # Relationships: files, origins, authors, molecules ----------------------
 
@@ -157,13 +155,13 @@ class Dataset(SQLModel, table=True):
     # (although it can have zero molecules)
     # A dataset can have only one origin (not a list)
     file: list["File"] = Relationship(back_populates="dataset")
-    origin: "DatasetOrigin" = Relationship(back_populates="dataset")
+    origin: Optional["DatasetOrigin"] = Relationship(back_populates="dataset")
     author: list["Author"] = Relationship(
         back_populates="dataset", link_model=DatasetAuthorLink
     )
-    molecule: Optional[list["Molecule"]] = Relationship(
-        back_populates="dataset", link_model=DatasetMoleculeLink
-    )
+    # molecule: Optional[list["Molecule"]] = Relationship(
+    #     back_populates="dataset", link_model=DatasetMoleculeLink
+    # )
 
 
 class File(SQLModel, table=True):
@@ -235,8 +233,8 @@ class Molecule(SQLModel, table=True):
     # Relationships: datasets, topology_files, -------------------------------
     # molecules_external_db, molecule_types
 
-    dataset: list[Dataset] = Relationship(
-        back_populates="molecule", link_model=DatasetMoleculeLink)
+    # dataset: list[Dataset] = Relationship(
+    #     back_populates="molecule", link_model=DatasetMoleculeLink)
     topology_file: list["TopologyFile"] = Relationship(
         back_populates="molecule", link_model=MoleculeTopologyLink)
     mol_ext_db: Optional[list["MoleculeExternalDb"]] = Relationship(
