@@ -1,4 +1,5 @@
 import pandas as pd
+from sqlmodel import Engine
 from sqlmodel import Session, select
 
 from db import engine
@@ -204,7 +205,7 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
     parent_files_by_name = {}
 
     with Session(engine) as session:
-        for _, row in FILES.iterrows():
+        for _, row in files_df.iterrows():
 
             # --- Handle FileType (one-to-many relationship) ---
             file_type_name = row["type"]
