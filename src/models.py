@@ -1,5 +1,3 @@
-# Imports
-
 from typing import Optional
 
 from sqlmodel import Field, Relationship, SQLModel
@@ -172,9 +170,9 @@ class File(SQLModel, table=True):
     dataset_id: int = Field(foreign_key="datasets.dataset_id")
     name: str
     file_type_id: int = Field(foreign_key="file_types.file_type_id")
-    size_in_bytes: int
-    md5: str
-    url: str
+    size_in_bytes: Optional[float] = Field(default=None)
+    md5: Optional[str] = Field(default=None) # files that belong to a zip file don't have md5
+    url: Optional[str] = Field(default=None) # files that belong to a zip file don't have url
     software_id: Optional[int] = Field(foreign_key="software.software_id")
     is_from_zip_file: bool = Field(index=True)
     parent_zip_file_id: Optional[int] = Field(

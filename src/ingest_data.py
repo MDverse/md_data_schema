@@ -1,18 +1,18 @@
 import pandas as pd
 from sqlmodel import Session, select
 
-from .db import engine
-from .models import (Author, 
-                     Dataset, 
-                     DatasetOrigin, 
-                     File, 
-                     FileType,
-                     TopologyFile,
-                     ParameterFile,
-                     TrajectoryFile,
-                     Thermostat,
-                     Barostat,
-                     Integrator)
+from db import engine
+from models import (Author, 
+                    Dataset, 
+                    DatasetOrigin, 
+                    File, 
+                    FileType,
+                    TopologyFile,
+                    ParameterFile,
+                    TrajectoryFile,
+                    Thermostat,
+                    Barostat,
+                    Integrator)
 
 """Purpose:
 This script takes care of transforming the data from the parquet files
@@ -45,6 +45,7 @@ datasets_data = pd.read_parquet(datasets_path)
 # Dataset, Author, DatasetOrigin 
 # ============================================================================
 
+# We rename the columns to match the SQLModel table columns
 DATASETS = datasets_data[[
     'dataset_origin',
     'dataset_id',
@@ -69,10 +70,10 @@ DATASETS = datasets_data[[
         })
 
 # For datasets["author"] column, we can have multiple authors
-# separated by a comma.
+# separated by a comma or a semicolon (replace semicolon with comma).
 # We need to split the authors but keep them concatenated.
 # We simply need to remove the space after the comma.
-DATASETS['author'] = DATASETS['author'].str.replace(", ", ",")
+DATASETS['author'] = DATASETS['author'].str.replace(", ", ",").str.replace(";", ",")
 
 # Normally we'd expect all datasets to have at least one author, but it
 # seems that datasets from OSF might not have an author field.
@@ -114,7 +115,7 @@ def create_datasets_authors_origins():
             # This also removes any leading/trailing whitespace from each name
             author_names = [
                 name.strip()
-                for name in row["author"].replace(";", ",").split(",")
+                for name in row["author"].split(",")
                 ]
             authors = [] # List stores Author objects for the current dataset.
             for name in author_names:
@@ -167,9 +168,17 @@ def create_datasets_authors_origins():
 # File, FileType
 # ============================================================================
 
-FILES = files_data[[
+
+def load_files_data(parquet_path: str) -> pd.DataFrame:
+    """Load parquet file and return a DataFrame with selected columns.
+
+    Rename columns to match the SQLModel table columns.
+    """
+    df = pd.read_parquet(parquet_path)
+    df = df[[
     'dataset_origin',
     'dataset_id',
+    'file_type',
     'file_name',
     'file_size',
     'file_md5',
@@ -178,6 +187,7 @@ FILES = files_data[[
     'origin_zip_file'
     ]].rename(columns={
         'dataset_id': 'dataset_id_in_origin',
+        'file_type': 'type',
         'file_name': 'name',
         'file_size': 'size_in_bytes',
         'file_md5': 'md5',
@@ -185,8 +195,10 @@ FILES = files_data[[
         'from_zip_file': 'is_from_zip_file',
         'origin_zip_file': 'parent_zip_file_name'
         })
+    return df
 
-def create_files():
+
+def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
 
     # Create a dictionary to store files by their name (if they are zip files)
     parent_files_by_name = {}
@@ -195,7 +207,7 @@ def create_files():
         for _, row in FILES.iterrows():
 
             # --- Handle FileType (one-to-many relationship) ---
-            file_type_name = row["file_type"]
+            file_type_name = row["type"]
             statement = select(FileType).where(
                 FileType.name == file_type_name
                 )
@@ -206,52 +218,58 @@ def create_files():
                 session.add(type_obj)
                 session.commit()
                 session.refresh(type_obj)
-        
+
+
             # --- Handle Dataset (one-to-many relationship) ---
-            dataset_id = row["dataset_id"]
+            dataset_id_in_origin = row["dataset_id_in_origin"]
             dataset_origin = row["dataset_origin"]
             statement = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id,
+                Dataset.id_in_origin == dataset_id_in_origin,
                 DatasetOrigin.name == dataset_origin
                 )
             dataset_obj = session.exec(statement).first()
+            if not dataset_obj:
+                print(f"Dataset with id_in_origin {dataset_id_in_origin} and origin {dataset_origin} not found.")
+                continue  # Skip if not found
 
 
             # --- Handle Recursive File (parent-child relationship) ---
-            # We have a column "parent_zip_file_name". For files that are from a zip file, use this to find the parent file.
+            # We have a column "parent_zip_file_name". 
+            # For files that are from a zip file, use this to find 
+            # the parent file file_id.
             parent_zip_file_name = row.get("parent_zip_file_name", None)
             parent_zip_file_id = None  # default is None
             if row["is_from_zip_file"]:
-                # Look up parent by name. You may already have created it earlier.
+                # Look up parent by name.
                 # Option 1: use the in-memory dictionary:
-                if parent_zip_file_name in parent_files_by_name:
-                    parent_zip_file_id = parent_files_by_name[parent_zip_file_name].file_id
-                else:
-                    # Option 2: query the database by file name (assuming parent's name is unique)
-                    parent_statement = select(File).where(File.name == parent_zip_file_name)
-                    parent_obj = session.exec(parent_statement).first()
-                    if parent_obj:
-                        parent_zip_file_id = parent_obj.file_id
-                        # Optionally, store it in the dictionary for later use
-                        parent_files_by_name[parent_zip_file_name] = parent_obj
-                    else:
-                        print(f"Parent file {parent_zip_file_name} not found for child {row['name']}.")
+                pass
+
+            # # If this file is a parent (i.e. not from a zip file), add it to the dictionary.
+            # if not row["is_from_zip_file"]:
+            #     parent_files_by_name[row["name"]] = file_obj
 
 
+            # --- Handle Software (which we have no data for currently 11/02/2025) ---
+            # We can simply leave it as None (or set to a default value if needed)
+            software_id = None
 
             file_obj = File(
-                dataset_id=dataset_obj,
                 name=row["name"],
-                file_type_id=type_obj,
                 size_in_bytes=row["size_in_bytes"],
                 md5=row["md5"],
                 url=row["url"],
                 is_from_zip_file=row["is_from_zip_file"],
-                #parent_zip_file_id=parent_zip_obj
+                software_id=software_id,
+                dataset_id=dataset_obj.dataset_id,  # use the actual integer id from the Dataset record
+                file_type_id=type_obj.file_type_id,  # use the actual file type id from FileType record
+                parent_zip_file_id = None
             )
 
-    pass
+            session.add(file_obj)
+            session.commit()
+            session.refresh(file_obj)
 
+            
 # ============================================================================
 # TopologyFile, Parameter,File, TrajectoryFile
 # Thermostat, Barostat, Integrator

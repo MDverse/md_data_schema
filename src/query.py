@@ -4,8 +4,8 @@ import pandas as pd
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from .db import engine
-from .models import Dataset, DatasetOrigin
+from db import engine
+from models import Dataset, DatasetOrigin
 
 """Purpose
 This script demonstrates how to query the database to extract and print
@@ -52,7 +52,10 @@ def print_dataset_origin_summary():
         results = session.exec(statement).all()
 
         # Print header
-        header = f"{'Dataset_origin':<15}{'Number of datasets':<20}{'First_dataset':<15}{'Last_dataset':<15}"
+        header = (
+            f"{'Dataset_origin':<15}{'Number of datasets':<20}"
+            f"{'First_dataset':<15}{'Last_dataset':<15}"
+        )
         print(header)
         print("-" * len(header))
 
@@ -64,7 +67,8 @@ def print_dataset_origin_summary():
             first_date = row.first_dataset if row.first_dataset else "None"
             last_date = row.last_dataset if row.last_dataset else "None"
             print(
-                f"{row.dataset_origin:<15}{row.number_of_datasets:<20}{first_date:<15}{last_date:<15}"
+                f"{row.dataset_origin:<15}{row.number_of_datasets:<20}"
+                f"{first_date:<15}{last_date:<15}"
             )
 
         # Add a totals row.
