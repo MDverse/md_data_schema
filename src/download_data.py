@@ -2,11 +2,18 @@ from pathlib import Path
 
 import requests
 
+"""Purpose:
+This script demonstrates how to download data from Zenodo using the Zenodo API.
+It fetches the metadata of a Zenodo record and downloads all .parquet files
+associated with that record. The files are saved to a specified folder (if the
+folder does not exist, it is created).
+"""
+
 # Zenodo API URL
 ZENODO_RECORD_ID = "7856806"
 ZENODO_API_URL = f"https://zenodo.org/api/records/{ZENODO_RECORD_ID}"
 
-# Set your desired output folder
+# Set the output folder
 OUTPUT_FOLDER = "data/parquet_files"
 
 # Ensure the output folder exists (create it if necessary)
@@ -14,6 +21,7 @@ output_path = Path(OUTPUT_FOLDER)
 if not output_path.exists():
     output_path.mkdir(parents=True, exist_ok=True)
     print(f"Created folder: {OUTPUT_FOLDER}\n")
+
 
 def get_parquet_files():
     """
@@ -42,6 +50,6 @@ def get_parquet_files():
                 f.write(file_response.content)
             print(f"Saved: {file_path}")
 
+
 # Call the function
 get_parquet_files()
-
