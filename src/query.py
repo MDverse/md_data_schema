@@ -1,13 +1,11 @@
 import time
 
+import pandas as pd
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-
-from .models import Dataset, DatasetOrigin
 from .db import engine
-
-import pandas as pd
+from .models import Dataset, DatasetOrigin
 
 """Purpose
 This script demonstrates how to query the database to extract and print
@@ -23,6 +21,7 @@ To launch this script, use the command uv run -m src.query
 """
 
 start = time.perf_counter()
+
 
 def print_dataset_origin_summary():
     """
@@ -43,7 +42,7 @@ def print_dataset_origin_summary():
                 DatasetOrigin.name.label("dataset_origin"),
                 func.count(Dataset.dataset_id).label("number_of_datasets"),
                 func.min(Dataset.date_created).label("first_dataset"),
-                func.max(Dataset.date_created).label("last_dataset")
+                func.max(Dataset.date_created).label("last_dataset"),
             )
             # We join on the relationship: dataset_origin.origin_id == dataset.origin_id
             .join(Dataset, Dataset.origin_id == DatasetOrigin.origin_id)
@@ -64,11 +63,14 @@ def print_dataset_origin_summary():
 
             first_date = row.first_dataset if row.first_dataset else "None"
             last_date = row.last_dataset if row.last_dataset else "None"
-            print(f"{row.dataset_origin:<15}{row.number_of_datasets:<20}{first_date:<15}{last_date:<15}")
+            print(
+                f"{row.dataset_origin:<15}{row.number_of_datasets:<20}{first_date:<15}{last_date:<15}"
+            )
 
         # Add a totals row.
         print("-" * len(header))
         print(f"{'total':<15}{total_count:<20}{'None':<15}{'None':<15}\n")
+
 
 def save_dataset_origin_zenodo():
     with Session(engine) as session:
@@ -80,9 +82,10 @@ def save_dataset_origin_zenodo():
             .join(DatasetOrigin, Dataset.origin_id == DatasetOrigin.origin_id)
             .where(DatasetOrigin.name == "zenodo")
         )
-        results = session.exec(statement).all() # This returns SQLModel objects
-        
-        # Convert the SQLModel objects into dictionaries so that pandas can work with them.
+        results = session.exec(statement).all()  # This returns SQLModel objects
+
+        # Convert the SQLModel objects into dictionaries so that pandas can
+        # work with them.
         data = [dataset.model_dump() for dataset in results]
         df = pd.DataFrame(data)
 
@@ -91,9 +94,11 @@ def save_dataset_origin_zenodo():
         print(df.dtypes, "\n")
         print(df.columns, "\n")
 
+
 def main():
     print_dataset_origin_summary()
     save_dataset_origin_zenodo()
+
 
 if __name__ == "__main__":
     main()
