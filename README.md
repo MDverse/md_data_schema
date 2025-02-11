@@ -42,18 +42,7 @@ data
     ├── gromacs_mdp_files.parquet
     ├── gromacs_xtc_files.parquet
 ```
-
-# 3) Data transformation
-
-After retrieving the data, we will be transforming it into a format that can be loaded into the database.
-
-```sh
-uv run src/transform_data.py
-```
-
-This will create `.csv` dataframes inside the `data` directory which will be loaded into the database. 
-
-# 4) Creating the database
+# 3) Creating the database
 
 After retrieving and transforming the data, you can create the database using:
 
@@ -61,7 +50,7 @@ After retrieving and transforming the data, you can create the database using:
 uv run -m src.app
 ```
 
-# 5) Visualizing the database
+# 4) Visualizing the database
 
 To explore the database visually, you can use **SQLite Browser**. Run the following command in your terminal:
 ```sh
