@@ -3,12 +3,38 @@ import time
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from .db import engine
-from .models import Dataset, DatasetOrigin
 
-start_time = time.time()
+from .models import Dataset, DatasetOrigin
+from .db import engine
+
+import pandas as pd
+
+"""Purpose
+This script demonstrates how to query the database to extract and print
+information. There currently are two functions in this script:
+1. print_dataset_origin_summary: Prints a summary of the dataset origins.
+2. save_dataset_origin_zenodo: Extracts and saves all datasets with origin
+"zenodo" as a pandas dataframe.
+
+We also measure the execution time of the script in order to get an idea of
+how long it takes to complete a query on the database.
+
+To launch this script, use the command uv run -m src.query
+"""
+
+start = time.perf_counter()
 
 def print_dataset_origin_summary():
+    """
+    Prints a summary of the dataset origins. For each origin,
+    it prints the number of datasets, the first dataset creation date,
+    and the last dataset creation date.
+
+    This is used mainly to demonstrate that the data was loaded correctly.
+    The results are printed to the console and compared to the original data
+    that can be found on https://mdverse.streamlit.app/
+    """
+
     with Session(engine) as session:
         # Build a query that joins DatasetOrigin and Dataset,
         # groups by origin name, and aggregates the data.
@@ -27,15 +53,7 @@ def print_dataset_origin_summary():
         results = session.exec(statement).all()
 
         # Print header
-        header = f"{
-            'Dataset_origin':<15
-            }{
-                'Number of datasets':<20
-                }{
-                    'First_dataset':<15
-                    }{
-                        'Last_dataset':<15
-                        }"
+        header = f"{'Dataset_origin':<15}{'Number of datasets':<20}{'First_dataset':<15}{'Last_dataset':<15}"
         print(header)
         print("-" * len(header))
 
@@ -50,14 +68,35 @@ def print_dataset_origin_summary():
 
         # Add a totals row.
         print("-" * len(header))
-        print(f"{'total':<15}{total_count:<20}{'None':<15}{'None':<15}")
+        print(f"{'total':<15}{total_count:<20}{'None':<15}{'None':<15}\n")
+
+def save_dataset_origin_zenodo():
+    with Session(engine) as session:
+        # Build a statement that selects Dataset records,
+        # joins to DatasetOrigin on the origin_id,
+        # and filters to only those with DatasetOrigin.name == "zenodo"
+        statement = (
+            select(Dataset)
+            .join(DatasetOrigin, Dataset.origin_id == DatasetOrigin.origin_id)
+            .where(DatasetOrigin.name == "zenodo")
+        )
+        results = session.exec(statement).all() # This returns SQLModel objects
+        
+        # Convert the SQLModel objects into dictionaries so that pandas can work with them.
+        data = [dataset.model_dump() for dataset in results]
+        df = pd.DataFrame(data)
+
+        # Print some information about the extracted dataframe
+        print(df.head(), "\n")
+        print(df.dtypes, "\n")
+        print(df.columns, "\n")
 
 def main():
     print_dataset_origin_summary()
+    save_dataset_origin_zenodo()
 
 if __name__ == "__main__":
     main()
 
-end_time = time.time()
-execution_time = end_time - start_time
+execution_time = time.perf_counter() - start
 print(f"Query execution time: {execution_time:.2f} seconds")
