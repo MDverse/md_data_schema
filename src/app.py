@@ -1,7 +1,7 @@
 import time
 
 from .db import create_db_and_tables
-from .ingest_data import create_datasets
+from .ingest_data import create_datasets_authors_origins
 
 """Purpose:
 This script takes care of creating the database and tables, and ingesting the data.
@@ -20,7 +20,7 @@ def main():
     create_db_and_tables()
 
     # Ingest the data into the database
-    create_datasets()
+    create_datasets_authors_origins()
 
 
 if __name__ == "__main__":
