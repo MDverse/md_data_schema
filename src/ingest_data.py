@@ -1,8 +1,8 @@
 import pandas as pd
-from sqlmodel import Engine
+from sqlalchemy import Engine
 from sqlmodel import Session, select
 
-from db import engine
+from create_engine import engine
 from models import (Author, 
                     Dataset, 
                     DatasetOrigin, 
@@ -26,6 +26,9 @@ How it works:
 - We rename the columns to match the SQLModel table columns.
 - We transform the data into the SQLModel objects.
 - We create the objects in the database.
+
+To launch this script, use the command:
+uv run python src/ingest_data.py
 """
 
 # Path to the parquet data files
@@ -46,48 +49,55 @@ datasets_data = pd.read_parquet(datasets_path)
 # Dataset, Author, DatasetOrigin 
 # ============================================================================
 
-# We rename the columns to match the SQLModel table columns
-DATASETS = datasets_data[[
-    'dataset_origin',
-    'dataset_id',
-    'doi',
-    'date_creation',
-    'date_last_modified',
-    'date_fetched',
-    'file_number',
-    'download_number',
-    'view_number',
-    'license',
-    'dataset_url',
-    'title',
-    'author',
-    'keywords',
-    'description'
-    ]].rename(columns={
-        'dataset_id': 'id_in_origin',
-        'date_creation': 'date_created',
-        'date_fetched': 'date_last_crawled',
-        'dataset_url': 'url'
-        })
+def load_datasets_data(parquet_path: str) -> pd.DataFrame:
+    """Load parquet file and return a DataFrame with selected columns.
 
-# For datasets["author"] column, we can have multiple authors
-# separated by a comma or a semicolon (replace semicolon with comma).
-# We need to split the authors but keep them concatenated.
-# We simply need to remove the space after the comma.
-DATASETS['author'] = DATASETS['author'].str.replace(", ", ",").str.replace(";", ",")
+    Rename columns to match the SQLModel table columns.
+    """
+    df = pd.read_parquet(parquet_path)
+    df = df[[
+        'dataset_origin',
+        'dataset_id',
+        'doi',
+        'date_creation',
+        'date_last_modified',
+        'date_fetched',
+        'file_number',
+        'download_number',
+        'view_number',
+        'license',
+        'dataset_url',
+        'title',
+        'author',
+        'keywords',
+        'description'
+        ]].rename(columns={
+            'dataset_id': 'id_in_origin',
+            'date_creation': 'date_created',
+            'date_fetched': 'date_last_crawled',
+            'dataset_url': 'url'
+            })
 
-# Normally we'd expect all datasets to have at least one author, but it
-# seems that datasets from OSF might not have an author field.
-# We need to account for that by replacing NaN with an empty string.
-DATASETS["author"] = DATASETS["author"].apply(
-    lambda x: x if pd.notna(x) else ""
-    )
+    # For datasets["author"] column, we can have multiple authors
+    # separated by a comma or a semicolon (replace semicolon with comma).
+    # We need to split the authors but keep them concatenated.
+    # We simply need to remove the space after the comma.
+    df['author'] = df['author'].str.replace(", ", ",").str.replace(";", ",")
 
-def create_datasets_authors_origins():
+    # Normally we'd expect all datasets to have at least one author, but it
+    # seems that datasets from OSF might not have an author field.
+    # We need to account for that by replacing NaN with an empty string.
+    df["author"] = df["author"].apply(
+        lambda x: x if pd.notna(x) else ""
+        )
+    
+    return df
+
+def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
     # The session is used to interact with the database—querying, adding,
     # and committing changes.
     with Session(engine) as session:
-        for _, row in DATASETS.iterrows():
+        for _, row in datasets_df.iterrows():
 
             # --- Handle DatasetOrigin (one-to-many relationship) ---
             origin_name = row["dataset_origin"]
@@ -177,35 +187,38 @@ def load_files_data(parquet_path: str) -> pd.DataFrame:
     """
     df = pd.read_parquet(parquet_path)
     df = df[[
-    'dataset_origin',
-    'dataset_id',
-    'file_type',
-    'file_name',
-    'file_size',
-    'file_md5',
-    'file_url',
-    'from_zip_file',
-    'origin_zip_file'
-    ]].rename(columns={
-        'dataset_id': 'dataset_id_in_origin',
-        'file_type': 'type',
-        'file_name': 'name',
-        'file_size': 'size_in_bytes',
-        'file_md5': 'md5',
-        'file_url': 'url',
-        'from_zip_file': 'is_from_zip_file',
-        'origin_zip_file': 'parent_zip_file_name'
-        })
+        'dataset_origin',
+        'dataset_id',
+        'file_type',
+        'file_name',
+        'file_size',
+        'file_md5',
+        'file_url',
+        'from_zip_file',
+        'origin_zip_file'
+        ]].rename(columns={
+            'dataset_id': 'dataset_id_in_origin',
+            'file_type': 'type',
+            'file_name': 'name',
+            'file_size': 'size_in_bytes',
+            'file_md5': 'md5',
+            'file_url': 'url',
+            'from_zip_file': 'is_from_zip_file',
+            'origin_zip_file': 'parent_zip_file_name'
+            })
     return df
 
 
 def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
+    """Create the FileType and File records in the database.
 
+    We need to handle the FileType, Dataset, and recursive File relationships.
+    """
     # Create a dictionary to store files by their name (if they are zip files)
-    parent_files_by_name = {}
+    parent_files_by_name = {} # key: (dataset_id, file_name), value: File object
 
     with Session(engine) as session:
-        for _, row in files_df.iterrows():
+        for _, row in files_df.iloc[0,10_000].iterrows():
 
             # --- Handle FileType (one-to-many relationship) ---
             file_type_name = row["type"]
@@ -240,15 +253,26 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
             # the parent file file_id.
             parent_zip_file_name = row.get("parent_zip_file_name", None)
             parent_zip_file_id = None  # default is None
-            if row["is_from_zip_file"]:
-                # Look up parent by name.
-                # Option 1: use the in-memory dictionary:
-                pass
 
-            # # If this file is a parent (i.e. not from a zip file), add it to the dictionary.
-            # if not row["is_from_zip_file"]:
-            #     parent_files_by_name[row["name"]] = file_obj
-
+            # If the file is from a zip file, we need to find the parent file file_id
+            if row["is_from_zip_file"] and parent_zip_file_name:
+                # Construct a key that combines the dataset id and parent's file name.
+                key = (dataset_obj.dataset_id, parent_zip_file_name) # Takes the dataset_id of the child file and the parent zip file_name
+                parent_zip_file_id = parent_files_by_name.get(key, None)
+                if not parent_zip_file_id:
+                    # Option 2: Query the database using both the file name and matching dataset id.
+                    parent_statement = (
+                        select(File)
+                        .where(File.name == parent_zip_file_name) # Find the parent file by name
+                        .where(File.dataset_id == dataset_obj.dataset_id) # Make sure it's in the same dataset_id as the current child file
+                    )
+                    parent_obj = session.exec(parent_statement).first()
+                    if parent_obj:
+                        parent_zip_file_id = parent_obj.file_id
+                        # Cache the found parent file for later use.
+                        parent_files_by_name[key] = parent_obj
+                    else:
+                        print(f"Parent file '{parent_zip_file_name}' not found for child '{row['name']}' with dataset_id {dataset_obj.dataset_id}.")
 
             # --- Handle Software (which we have no data for currently 11/02/2025) ---
             # We can simply leave it as None (or set to a default value if needed)
@@ -263,12 +287,18 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                 software_id=software_id,
                 dataset_id=dataset_obj.dataset_id,  # use the actual integer id from the Dataset record
                 file_type_id=type_obj.file_type_id,  # use the actual file type id from FileType record
-                parent_zip_file_id = None
+                parent_zip_file_id = parent_zip_file_id
             )
 
             session.add(file_obj)
             session.commit()
             session.refresh(file_obj)
+
+            # If this file is a parent file (i.e. not extracted from a zip),
+            # then store it in the cache using its dataset_id and name.
+            if not row["is_from_zip_file"]:
+                key = (dataset_obj.dataset_id, row["name"])
+                parent_files_by_name[key] = file_obj
 
             
 # ============================================================================
@@ -311,5 +341,23 @@ TRAJECTORY_FILES = xtc_data[[
         'file_name': 'name'
         })
 
-def create_simulation_files():
+def create_simulation_tables():
     pass
+
+
+def data_ingestion():
+    # Load the datasets data
+    datasets_df = load_datasets_data(datasets_path)
+    create_datasets_tables(datasets_df, engine)
+
+    # Load the files data
+    # files_df = load_files_data(files_path)
+    # create_files_tables(files_df, engine)
+
+    # Create the simulation tables
+    # create_simulation_tables()
+
+    print("Data ingestion complete.")
+
+if __name__ == "__main__":
+    data_ingestion()
