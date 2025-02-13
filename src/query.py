@@ -2,10 +2,12 @@ import time
 
 import pandas as pd
 from sqlalchemy import func
+from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
+import random
 
-from db import engine
-from models import Dataset, DatasetOrigin
+from create_engine import engine
+from models import Dataset, DatasetOrigin, File, FileType
 
 """Purpose
 This script demonstrates how to query the database to extract and print
@@ -17,7 +19,8 @@ information. There currently are two functions in this script:
 We also measure the execution time of the script in order to get an idea of
 how long it takes to complete a query on the database.
 
-To launch this script, use the command uv run -m src.query
+To launch this script, use the command:
+uv run python src/query.py
 """
 
 start = time.perf_counter()
@@ -76,7 +79,7 @@ def print_dataset_origin_summary():
         print(f"{'total':<15}{total_count:<20}{'None':<15}{'None':<15}\n")
 
 
-def save_dataset_origin_zenodo():
+def query_to_dataframe():
     with Session(engine) as session:
         # Build a statement that selects Dataset records,
         # joins to DatasetOrigin on the origin_id,
@@ -98,10 +101,53 @@ def save_dataset_origin_zenodo():
         print(df.dtypes, "\n")
         print(df.columns, "\n")
 
+def random_mdp_information():
+
+    with Session(engine) as session:
+        # When you perform a join on the same table more than once—in this case,
+        # joining the File table to itself—you need a way to distinguish between
+        # the two instances. This is where an alias comes in.
+        ParentFile = aliased(File) # Alias for the parent file
+
+        # Build a query that:
+        # - Joins File to its Dataset and DatasetOrigin, and FileType
+        # - Does a left outer join to ParentFile so we can get the parent's name.
+        # - Filters for files whose name ends with ".mdp" (case-insensitive).
+        statement = (
+            select(
+                Dataset.id_in_origin,
+                Dataset.url,
+                DatasetOrigin.name.label("dataset_origin"),
+                File.name.label("file_name"),
+                File.size_in_bytes,
+                FileType.name.label("file_type"),
+                ParentFile.name.label("parent_file_name")
+            )
+            .join(Dataset, File.dataset_id == Dataset.dataset_id)
+            .join(DatasetOrigin, Dataset.origin_id == DatasetOrigin.origin_id)
+            .join(FileType, File.file_type_id == FileType.file_type_id)
+            .outerjoin(ParentFile, File.parent_zip_file_id == ParentFile.file_id)
+            .where(FileType.name == "mdp")
+        )
+
+        # Execute the query and retrieve all matching rows
+        results = session.exec(statement).all()
+        count_mdp = len(results)
+        print(f"Nombre de fichiers .mdp: {count_mdp}")
+        
+        if count_mdp == 0:
+            print("Aucun fichier .mdp trouvé.")
+            return
+        
+        # Select one random file
+        random_row = random.choice(results)
+
+        # Print the information about the random file
 
 def main():
-    print_dataset_origin_summary()
-    save_dataset_origin_zenodo()
+    # print_dataset_origin_summary()
+    # query_to_dataframe()
+    random_mdp_information()
 
 
 if __name__ == "__main__":
