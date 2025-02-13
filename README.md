@@ -43,26 +43,16 @@ data
     ├── gromacs_xtc_files.parquet
 ```
 
-# 3) Creating the engine
+# 3) Creating the database
 
-After retrieving the data and setting up the environment, we need to create the engine. This will be used to interact with the database.
-
-To do this, run the following command:
-
-```sh
-uv run python src/create_engine.py
-```
-
-# 4) Creating the database
-
-Now that the engine has been created, we need to create the database with all the different tables.
+Now that we retrieved the necessary data, we need to create the database with all the different tables.
 To do this, run:
 
 ```sh
 uv run python src/create_database.py
 ```
 
-# 5) Ingest the data
+# 4) Ingest the data
 
 Finally, we need to ingest the data into the database. This will populate the tables with the data from the parquet data files we retrieved earlier.
 
@@ -72,7 +62,7 @@ To ingest the data, run the following command:
 uv run python src/ingest_data.py
 ```
 
-# 6) Visualizing the database
+# 5) Visualizing the database
 
 To explore the database visually, you can use **SQLite Browser**. Run the following command in your terminal:
 ```sh
