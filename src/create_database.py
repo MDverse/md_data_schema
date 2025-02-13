@@ -22,4 +22,4 @@ if __name__ == "__main__":
     main()
 
 execution_time = time.perf_counter() - start
-print(f"Script execution time: {execution_time:.2f} seconds")
+print(f"Database and tables creation time: {execution_time:.2f} seconds")

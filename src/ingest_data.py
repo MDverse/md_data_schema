@@ -1,4 +1,6 @@
 import pandas as pd
+import time
+
 from sqlalchemy import Engine
 from sqlmodel import Session, select
 
@@ -215,10 +217,10 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
     We need to handle the FileType, Dataset, and recursive File relationships.
     """
     # Create a dictionary to store files by their name (if they are zip files)
-    parent_files_by_name = {} # key: (dataset_id, file_name), value: File object
+    parent_files_by_name = {} # key: (dataset_id, file_name), value: File file_id
 
     with Session(engine) as session:
-        for _, row in files_df.iloc[0,10_000].iterrows():
+        for _, row in files_df.iterrows():
 
             # --- Handle FileType (one-to-many relationship) ---
             file_type_name = row["type"]
@@ -258,8 +260,12 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
             if row["is_from_zip_file"] and parent_zip_file_name:
                 # Construct a key that combines the dataset id and parent's file name.
                 key = (dataset_obj.dataset_id, parent_zip_file_name) # Takes the dataset_id of the child file and the parent zip file_name
+                
+                # Option 1: Check if we have already found the parent file in the cache.
                 parent_zip_file_id = parent_files_by_name.get(key, None)
+                
                 if not parent_zip_file_id:
+                    print("Parent file not found in cache.\n Searching in the database...")
                     # Option 2: Query the database using both the file name and matching dataset id.
                     parent_statement = (
                         select(File)
@@ -296,11 +302,10 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
 
             # If this file is a parent file (i.e. not extracted from a zip),
             # then store it in the cache using its dataset_id and name.
-            if not row["is_from_zip_file"]:
+            if not row["is_from_zip_file"] and type_obj.name == "zip":
                 key = (dataset_obj.dataset_id, row["name"])
-                parent_files_by_name[key] = file_obj
+                parent_files_by_name[key] = file_obj.file_id
 
-            
 # ============================================================================
 # TopologyFile, Parameter,File, TrajectoryFile
 # Thermostat, Barostat, Integrator
@@ -344,19 +349,31 @@ TRAJECTORY_FILES = xtc_data[[
 def create_simulation_tables():
     pass
 
+# ============================================================================
 
 def data_ingestion():
+    start_1 = time.perf_counter()
+    start_3 = time.perf_counter()
+
     # Load the datasets data
     datasets_df = load_datasets_data(datasets_path)
     create_datasets_tables(datasets_df, engine)
+    execution_time = time.perf_counter() - start_1
+    print(f"Datasets ingestion time: {execution_time:.2f} seconds\n")
+
+    start_2 = time.perf_counter()
 
     # Load the files data
-    # files_df = load_files_data(files_path)
-    # create_files_tables(files_df, engine)
+    files_df = load_files_data(files_path)
+    create_files_tables(files_df, engine)
+    execution_time = time.perf_counter() - start_2
+    print(f"Files ingestion time: {execution_time:.2f} seconds\n")
+
 
     # Create the simulation tables
     # create_simulation_tables()
-
+    execution_time = time.perf_counter() - start_3
+    print(f"Data ingestion time: {execution_time:.2f} seconds")
     print("Data ingestion complete.")
 
 if __name__ == "__main__":
