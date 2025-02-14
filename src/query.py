@@ -1,3 +1,4 @@
+import random
 import time
 
 import pandas as pd
@@ -5,7 +6,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
-# import random
 from create_engine import engine
 from models import Dataset, DatasetOrigin, File, FileType
 
@@ -133,22 +133,44 @@ def random_mdp_information():
         # Execute the query and retrieve all matching rows
         results = session.exec(statement).all()
         count_mdp = len(results)
-        print(f"Nombre de fichiers .mdp: {count_mdp}")
+        print(f"Total number of .mdp files: {count_mdp}\n")
 
         if count_mdp == 0:
-            print("Aucun fichier .mdp trouvé.")
+            print("No .mdp file found.")
             return
 
         # Select one random file
-        # random_row = random.choice(results)
+        random_row = random.choice(results)
 
         # Print the information about the random file
+        # Prepare a dictionary to represent the table row.
+        # (If a file is not from a zip file, parent_file_name will be None.)
+        table_row = {
+            "Dataset.id_in_origin": random_row.id_in_origin,
+            "Dataset.origin": random_row.dataset_origin,
+            "Dataset.url": random_row.url,
+            "File.name": random_row.file_name,
+            "File.size_in_bytes": random_row.size_in_bytes,
+            # Using the parent's name here instead of the ID
+            "File.parent_zip_file_id": random_row.parent_file_name
+        }
+
+        # Print the result in a vertical (row-by-row) format.
+        print("Random .mdp file Information:")
+        print("-" * 40)
+        for key, value in table_row.items():
+            # Convert None to a string "None" for safe formatting
+            value_str = value
+            print(f"{key}: {value_str}")
+        print("-" * 40, "\n")
 
 def main():
-    # print_dataset_origin_summary()
-    # query_to_dataframe()
+    print_dataset_origin_summary()
+    print("\n\n")
+    query_to_dataframe()
+    print("\n\n")
     random_mdp_information()
-
+    print("\n\n")
 
 if __name__ == "__main__":
     main()

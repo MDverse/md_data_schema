@@ -11,12 +11,12 @@ from models import (Author,
                     DatasetOrigin,
                     File,
                     FileType,
-                    TopologyFile,
-                    ParameterFile,
-                    TrajectoryFile,
-                    Thermostat,
-                    Barostat,
-                    Integrator)
+                    TopologyFile,  # noqa: F401
+                    ParameterFile,  # noqa: F401
+                    TrajectoryFile,  # noqa: F401
+                    Thermostat,  # noqa: F401
+                    Barostat,  # noqa: F401
+                    Integrator)  # noqa: F401
 
 """Purpose:
 This script takes care of transforming the data from the parquet files
@@ -358,6 +358,53 @@ TRAJECTORY_FILES = xtc_data[[
     ]].rename(columns={
         'file_name': 'name'
         })
+
+def load_simulation_files_data(
+        parquet_path_topology: str,
+        parquet_path_parameter:str,
+        parquet_path_trajectory:str
+        ) -> pd.DataFrame:
+
+    df_topology = pd.read_parquet(parquet_path_topology)
+    df_parameter = pd.read_parquet(parquet_path_parameter)
+    df_trajectory = pd.read_parquet(parquet_path_trajectory)
+
+    df_topology = df_topology[[
+        'dataset_origin',
+        'dataset_id',
+        'file_name',
+        'atom_number',
+        'has_protein',
+        'has_nucleic',
+        'has_lipid',
+        'has_glucid',
+        "has_water_ion"
+        ]].rename(columns={
+            'file_name': 'name'
+            })
+
+    df_parameter = df_parameter[[
+        'dataset_origin',
+        'dataset_id',
+        'file_name',
+        'dt',
+        'nsteps',
+        'temperature'
+        ]].rename(columns={
+            'file_name': 'name'
+            })
+
+    df_trajectory = df_trajectory[[
+        'dataset_origin',
+        'dataset_id',
+        'file_name',
+        'atom_number',
+        'frame_number'
+        ]].rename(columns={
+            'file_name': 'name'
+            })
+
+    pass
 
 def create_simulation_tables():
     pass
