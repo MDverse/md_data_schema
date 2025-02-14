@@ -4,8 +4,8 @@ import pandas as pd
 from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
-import random
 
+# import random
 from create_engine import engine
 from models import Dataset, DatasetOrigin, File, FileType
 
@@ -107,7 +107,7 @@ def random_mdp_information():
         # When you perform a join on the same table more than once—in this case,
         # joining the File table to itself—you need a way to distinguish between
         # the two instances. This is where an alias comes in.
-        ParentFile = aliased(File) # Alias for the parent file
+        ParentFile = aliased(File) # Alias for the parent file  # noqa: N806
 
         # Build a query that:
         # - Joins File to its Dataset and DatasetOrigin, and FileType
@@ -134,13 +134,13 @@ def random_mdp_information():
         results = session.exec(statement).all()
         count_mdp = len(results)
         print(f"Nombre de fichiers .mdp: {count_mdp}")
-        
+
         if count_mdp == 0:
             print("Aucun fichier .mdp trouvé.")
             return
-        
+
         # Select one random file
-        random_row = random.choice(results)
+        # random_row = random.choice(results)
 
         # Print the information about the random file
 

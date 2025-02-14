@@ -1,14 +1,15 @@
-import pandas as pd
-import time
+import time  # noqa: I001
 
+import pandas as pd
 from sqlalchemy import Engine
 from sqlmodel import Session, select
 
 from create_engine import engine
-from models import (Author, 
-                    Dataset, 
-                    DatasetOrigin, 
-                    File, 
+
+from models import (Author,
+                    Dataset,
+                    DatasetOrigin,
+                    File,
                     FileType,
                     TopologyFile,
                     ParameterFile,
@@ -48,7 +49,7 @@ files_data = pd.read_parquet(files_path)
 datasets_data = pd.read_parquet(datasets_path)
 
 # ============================================================================
-# Dataset, Author, DatasetOrigin 
+# Dataset, Author, DatasetOrigin
 # ============================================================================
 
 def load_datasets_data(parquet_path: str) -> pd.DataFrame:
@@ -92,7 +93,7 @@ def load_datasets_data(parquet_path: str) -> pd.DataFrame:
     df["author"] = df["author"].apply(
         lambda x: x if pd.notna(x) else ""
         )
-    
+
     return df
 
 def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
@@ -245,13 +246,16 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                 )
             dataset_obj = session.exec(statement).first()
             if not dataset_obj:
-                print(f"Dataset with id_in_origin {dataset_id_in_origin} and origin {dataset_origin} not found.")
+                print(
+                    f"Dataset with id_in_origin {dataset_id_in_origin}"
+                    f"and origin {dataset_origin} not found."
+                    )
                 continue  # Skip if not found
 
 
             # --- Handle Recursive File (parent-child relationship) ---
-            # We have a column "parent_zip_file_name". 
-            # For files that are from a zip file, use this to find 
+            # We have a column "parent_zip_file_name".
+            # For files that are from a zip file, use this to find
             # the parent file file_id.
             parent_zip_file_name = row.get("parent_zip_file_name", None)
             parent_zip_file_id = None  # default is None
@@ -259,18 +263,22 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
             # If the file is from a zip file, we need to find the parent file file_id
             if row["is_from_zip_file"] and parent_zip_file_name:
                 # Construct a key that combines the dataset id and parent's file name.
-                key = (dataset_obj.dataset_id, parent_zip_file_name) # Takes the dataset_id of the child file and the parent zip file_name
-                
+                # Takes the dataset_id of the child file and the parent zip file_name
+                key = (dataset_obj.dataset_id, parent_zip_file_name)
+
                 # Option 1: Check if we have already found the parent file in the cache.
                 parent_zip_file_id = parent_files_by_name.get(key, None)
-                
+
                 if not parent_zip_file_id:
-                    print("Parent file not found in cache.\n Searching in the database...")
-                    # Option 2: Query the database using both the file name and matching dataset id.
+                    print("Parent file not found in cache.")
+                    print("Searching in the database...")
+                    # Option 2: Query the DB using both the file name and dataset id.
                     parent_statement = (
                         select(File)
-                        .where(File.name == parent_zip_file_name) # Find the parent file by name
-                        .where(File.dataset_id == dataset_obj.dataset_id) # Make sure it's in the same dataset_id as the current child file
+                        # Find the parent file by name
+                        .where(File.name == parent_zip_file_name)
+                        # Make sure it's in the same dataset_id as the child file
+                        .where(File.dataset_id == dataset_obj.dataset_id)
                     )
                     parent_obj = session.exec(parent_statement).first()
                     if parent_obj:
@@ -278,7 +286,10 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                         # Cache the found parent file for later use.
                         parent_files_by_name[key] = parent_obj
                     else:
-                        print(f"Parent file '{parent_zip_file_name}' not found for child '{row['name']}' with dataset_id {dataset_obj.dataset_id}.")
+                        print(
+                            f"Parent file '{parent_zip_file_name}' not found for child"
+                            f"'{row['name']}' with dataset_id {dataset_obj.dataset_id}."
+                            )
 
             # --- Handle Software (which we have no data for currently 11/02/2025) ---
             # We can simply leave it as None (or set to a default value if needed)
@@ -291,8 +302,10 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                 url=row["url"],
                 is_from_zip_file=row["is_from_zip_file"],
                 software_id=software_id,
-                dataset_id=dataset_obj.dataset_id,  # use the actual integer id from the Dataset record
-                file_type_id=type_obj.file_type_id,  # use the actual file type id from FileType record
+                # use the integer id from the Dataset record
+                dataset_id=dataset_obj.dataset_id,
+                # use the file type id from FileType record
+                file_type_id=type_obj.file_type_id,
                 parent_zip_file_id = parent_zip_file_id
             )
 
