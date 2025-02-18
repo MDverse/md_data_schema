@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
 
 # ============================================================================
 
@@ -112,6 +112,22 @@ class MoleculeTopologyLink(SQLModel, table=True):
         default=None, foreign_key="topology_files.file_id", primary_key=True
     )
 
+class DatasetKeywordLink(SQLModel, table=True):
+    """
+    MtM link table between Dataset and Molecule
+    LOGIC: A dataset can have 0 or many keywords and,
+    a keyword it is definitely in a dataset or many datasets.
+    """
+
+    __tablename__ = "datasets_keywords_link"
+
+    dataset_id: Optional[int] = Field(
+        default=None, foreign_key="datasets.dataset_id", primary_key=True
+    )
+    keyword_id: Optional[int] = Field(
+        default=None, foreign_key="keywords.keyword_id", primary_key=True
+    )
+
 
 # ============================================================================
 # Main Tables
@@ -143,8 +159,6 @@ class Dataset(SQLModel, table=True):
     license: Optional[str] = Field(default=None)
     url: str
     title: str
-
-    keywords: Optional[str]  # = Field(index=True) ; keywords separated by ";"
     description: Optional[str] = None
 
     # Relationships: files, origins, authors, molecules ----------------------
@@ -157,9 +171,12 @@ class Dataset(SQLModel, table=True):
     author: list["Author"] = Relationship(
         back_populates="dataset", link_model=DatasetAuthorLink
     )
-    # molecule: Optional[list["Molecule"]] = Relationship(
-    #     back_populates="dataset", link_model=DatasetMoleculeLink
-    # )
+    molecule: Optional[list["Molecule"]] = Relationship(
+        back_populates="dataset", link_model=DatasetMoleculeLink
+    )
+    keyword: Optional[list["Keyword"]] = Relationship(
+        back_populates="dataset", link_model=DatasetKeywordLink
+    )
 
 
 class File(SQLModel, table=True):
@@ -203,11 +220,12 @@ class File(SQLModel, table=True):
 
 class Author(SQLModel, table=True):
     __tablename__ = "authors"
+    __table_args__ = (UniqueConstraint("name", "orcid"),)
 
     # Attributes/Table columns -----------------------------------------------
     author_id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    orcid: Optional[str] = Field(default=None, unique=True)
+    orcid: Optional[str] = Field(default=None)
 
     # Relationships: dataset
     dataset: list[Dataset] = Relationship(
@@ -230,8 +248,8 @@ class Molecule(SQLModel, table=True):
     # Relationships: datasets, topology_files, -------------------------------
     # molecules_external_db, molecule_types
 
-    # dataset: list[Dataset] = Relationship(
-    #     back_populates="molecule", link_model=DatasetMoleculeLink)
+    dataset: list[Dataset] = Relationship(
+        back_populates="molecule", link_model=DatasetMoleculeLink)
     topology_file: list["TopologyFile"] = Relationship(
         back_populates="molecule", link_model=MoleculeTopologyLink
     )
@@ -302,18 +320,18 @@ class ParameterFile(SQLModel, table=True):
     file_id: Optional[int] = Field(
         default=None, primary_key=True, foreign_key="files.file_id"
     )
-    dt: float
-    nsteps: int
-    temperature: float
+    dt: Optional[float] = Field(default=None)
+    nsteps: Optional[int] = Field(default=None)
+    temperature: Optional[float] = Field(default=None)
     thermostat_id: Optional[int] = Field(foreign_key="thermostats.thermostat_id")
     barostat_id: Optional[int] = Field(foreign_key="barostats.barostat_id")
-    integrator_id: int = Field(foreign_key="integrators.integrator_id")
+    integrator_id: Optional[int] = Field(foreign_key="integrators.integrator_id")
 
     # Relationships: files, thermostats, barostats, integrators
     file: File = Relationship(back_populates="parameter_file")
     thermostat: Optional["Thermostat"] = Relationship(back_populates="parameter_file")
     barostat: Optional["Barostat"] = Relationship(back_populates="parameter_file")
-    integrator: "Integrator" = Relationship(back_populates="parameter_file")
+    integrator: Optional["Integrator"] = Relationship(back_populates="parameter_file")
 
 
 class TrajectoryFile(SQLModel, table=True):
@@ -343,6 +361,17 @@ simulations, the different types of molecules, etc.
 These tables have a one-to-many relationship with the main tables.
 """
 
+class Keyword(SQLModel, table=True):
+    __tablename__ = "keywords"
+
+    # Attributes/Table columns -----------------------------------------------
+    keyword_id: Optional[int] = Field(default=None, primary_key=True)
+    entry: str = Field(unique=True)
+
+    # Relationships: datasets
+    dataset: list[Dataset] = Relationship(
+        back_populates="keyword", link_model=DatasetKeywordLink
+        )
 
 class FileType(SQLModel, table=True):
     __tablename__ = "file_types"
@@ -386,9 +415,12 @@ class DatasetOrigin(SQLModel, table=True):
 
 class Software(SQLModel, table=True):
     __tablename__ = "software"
+    __table_args__ = (UniqueConstraint("name", "version"),)
+
 
     software_id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(unique=True)
+    name: str
+    version: Optional[str] = Field(default=None)
 
     # Relationships: files
     file: list[File] = Relationship(back_populates="softwares")
