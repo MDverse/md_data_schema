@@ -11,8 +11,8 @@ dependencies = [
     "pandas>=2.2.3",
     "pyarrow>=19.0.0",
     "requests>=2.32.3",
-    "ruff>=0.9.4",
     "sqlmodel>=0.0.22",
+    "tqdm>=4.67.1",
 ]
 
 [tool.ruff]
@@ -37,6 +37,8 @@ docstring-code-line-length = 79
 
 [dependency-groups]
 dev = [
+    "black>=25.1.0",
+    "pytest>=8.3.4",
     "ruff>=0.9.4",
 ]
 
