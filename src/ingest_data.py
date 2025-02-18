@@ -1,22 +1,49 @@
-import time  # noqa: I001
+import sys
+import time
+from pathlib import Path
 
 import pandas as pd
+from loguru import logger # type: ignore
 from sqlalchemy import Engine
 from sqlmodel import Session, select
+from tqdm import tqdm
 
 from create_engine import engine
+from models import (
+    Author,
+    Barostat,
+    Dataset,
+    DatasetOrigin,
+    File,
+    FileType,
+    Integrator,
+    Keyword,
+    ParameterFile,
+    Thermostat,
+    TopologyFile,
+    TrajectoryFile,
+)
 
-from models import (Author,
-                    Dataset,
-                    DatasetOrigin,
-                    File,
-                    FileType,
-                    TopologyFile,  # noqa: F401
-                    ParameterFile,  # noqa: F401
-                    TrajectoryFile,  # noqa: F401
-                    Thermostat,  # noqa: F401
-                    Barostat,  # noqa: F401
-                    Integrator)  # noqa: F401
+logger.remove()
+logger.add(sys.stderr,
+           format="{time:MMMM D, YYYY - HH:mm:ss} | <lvl>{level} --- {message}</lvl>",
+           level="INFO"
+           )
+
+# Log file will be erased at each run
+# Remove mode="w" to keep log file between runs
+logger.add(f"{Path(__file__).stem}.log", mode="w",
+           format="{time:MMMM D, YYYY - HH:mm:ss} | <lvl>{level} --- {message}</lvl>",
+           level="DEBUG"
+           )
+
+# logger.trace("A trace message.")
+# logger.debug("A debug message.")
+# logger.info("An info message.")
+# logger.success("A success message.")
+# logger.warning("A warning message.")
+# logger.error("An error message.")
+# logger.critical("A critical message.")
 
 """Purpose:
 This script takes care of transforming the data from the parquet files
@@ -86,6 +113,13 @@ def load_datasets_data(parquet_path: str) -> pd.DataFrame:
     # We need to split the authors but keep them concatenated.
     # We simply need to remove the space after the comma.
     df['author'] = df['author'].str.replace(", ", ",").str.replace(";", ",")
+    df['keywords'] = df['keywords'].str.replace(
+        ", ", ","
+        ).str.replace(
+            "; ", ";"
+            ).str.replace(
+                ",", ";"
+                )
 
     # Normally we'd expect all datasets to have at least one author, but it
     # seems that datasets from OSF might not have an author field.
@@ -94,13 +128,53 @@ def load_datasets_data(parquet_path: str) -> pd.DataFrame:
         lambda x: x if pd.notna(x) else ""
         )
 
+    df["keywords"] = df["keywords"].apply(
+        lambda x: x if pd.notna(x) else ""
+        )
+
     return df
 
 def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
+    """
+    Create or update dataset-related tables in the database.
+
+    This function processes a DataFrame containing dataset information and
+    updates the database accordingly. It handles the creation and updating
+    of Dataset, Author, DatasetOrigin, and Keyword entries.
+
+    Args:
+        datasets_df (pd.DataFrame): DataFrame containing dataset information.
+        engine (Engine): SQLAlchemy Engine instance to connect to the database.
+
+    Returns:
+        None
+
+    Process:
+        - Inserts new records into the Dataset, Author, DatasetOrigin,
+        and Keyword tables.
+        - Updates existing records if changes are detected.
+        - Logs the number of records created, updated, or ignored.
+
+    """
+    total_rows = len(datasets_df)
+    logger.info(
+        "Starting to create datasets tables: Dataset, Author, DatasetOrigin, Keyword."
+        )
+
+    # Counters for the number of records created, updated, or ignored.
+    created_count = 0
+    updated_count = 0
+    ignored_count = 0
+
     # The session is used to interact with the database—querying, adding,
     # and committing changes.
     with Session(engine) as session:
-        for _, row in datasets_df.iterrows():
+        for _, row in tqdm(
+            datasets_df.iterrows(),
+            total=total_rows,
+            desc="Processing rows",
+            unit="row"
+            ):
 
             # --- Handle DatasetOrigin (one-to-many relationship) ---
             origin_name = row["dataset_origin"]
@@ -122,6 +196,7 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                 session.add(origin_obj)
                 session.commit()  # Commit so origin_obj gets its origin_id
                 session.refresh(origin_obj)
+
 
             # --- Handle Author(s) (many-to-many relationship) ---
             # If there are multiple authors separated by a delimiter (","),
@@ -146,37 +221,127 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                 # objects for the current dataset).
                 authors.append(author_obj)
 
-            # --- Create the Dataset ---
-            dataset_obj = Dataset(
-                id_in_origin=row["id_in_origin"],
-                doi=row["doi"],
-                date_created=row["date_created"],
-                date_last_modified=row["date_last_modified"],
-                date_last_crawled=row["date_last_crawled"],
-                file_number=row["file_number"],
-                download_number=row["download_number"],
-                view_number=row["view_number"],
-                license=row["license"],
-                url=row["url"],
-                title=row["title"],
-                # use .get() if the field might be missing
-                keywords=row.get("keywords"),
-                description=row.get("description"),
-                origin=origin_obj,   # assign the related origin
-            )
 
-            # Assign the many-to-many relationship for authors:
-            # In our Dataset model, we have defined an attribute called author
-            # that represents a MtM relationship with the Author model.
-            # When we write the following, we are assigning the list of Author
-            # objects (collected in the authors list) to the dataset’s author
-            # attribute. This informs SQLModel/SQLAlchemy to create the
-            # appropriate link table entries so that the dataset is
-            # related to all these authors.
-            dataset_obj.author = authors
+            # --- Handle Keyword(s) (many-to-many relationship) ---
+            # If there are multiple keywords separated by a delimiter (";"),
+            # split and process them accordingly.
+            # This also removes any leading/trailing whitespace
+            # from between each keyword.
+            keywords = [
+                keyword.strip()
+                for keyword in row["keywords"].split(";")
+                ]
+            keyword_entries = []  # List stores Keyword objects for the current dataset.
+            for keyword in keywords:
+                statement = select(Keyword).where(Keyword.entry == keyword)
+                keyword_obj = session.exec(statement).first()
+                if not keyword_obj:
+                    keyword_obj = Keyword(entry=keyword)
+                    session.add(keyword_obj)
+                    session.commit()
+                    session.refresh(keyword_obj)
+                if keyword_obj not in keyword_entries:
+                    keyword_entries.append(keyword_obj)
 
-            session.add(dataset_obj)
-            session.commit()
+
+            # --- Check if the Dataset already exists ---
+            # Uniqueness is determined by (origin, id_in_origin)
+            dataset_id_in_origin = row["id_in_origin"]
+            dataset_origin = row["dataset_origin"]
+            dataset_stmt = select(Dataset).join(DatasetOrigin).where(
+                Dataset.id_in_origin == dataset_id_in_origin,
+                DatasetOrigin.name == dataset_origin
+                )
+            existing_dataset = session.exec(dataset_stmt).first()
+
+            if not existing_dataset:
+            # --- Create the Dataset entry ---
+                new_dataset_obj = Dataset(
+                    id_in_origin=row["id_in_origin"],
+                    doi=row["doi"],
+                    date_created=row["date_created"],
+                    date_last_modified=row["date_last_modified"],
+                    date_last_crawled=row["date_last_crawled"],
+                    file_number=row["file_number"],
+                    download_number=row["download_number"],
+                    view_number=row["view_number"],
+                    license=row["license"],
+                    url=row["url"],
+                    title=row["title"],
+                    # use .get() if the field might be missing
+                    keywords=row.get("keywords"),
+                    description=row.get("description"),
+                    origin=origin_obj,   # assign the related origin
+                )
+
+                # Assign the many-to-many relationship for authors:
+                # In our Dataset model, we have defined an attribute called author
+                # that represents a MtM relationship with the Author model.
+                # When we write the following, we are assigning the list of Author
+                # objects (collected in the authors list) to the dataset’s author
+                # attribute. This informs SQLModel/SQLAlchemy to create the
+                # appropriate link table entries so that the dataset is
+                # related to all these authors.
+                new_dataset_obj.author = authors
+
+                # Assign the many-to-many relationship for keywords:
+                new_dataset_obj.keyword = keyword_entries
+
+                session.add(new_dataset_obj)
+                session.commit()
+
+            else:
+                # Compare fields to decide whether to update or ignore.
+                changed = False
+
+                # Compare simple fields
+                fields_to_check = [
+                    "doi",
+                    "date_created",
+                    "date_last_modified",
+                    "date_last_crawled",
+                    "file_number",
+                    "download_number",
+                    "view_number",
+                    "license",
+                    "url",
+                    "title",
+                ]
+
+                for field in fields_to_check:
+                    new_value = row[field]
+                    current_value = getattr(existing_dataset, field)
+                    if new_value != current_value:
+                        setattr(existing_dataset, field, new_value)
+                        changed = True
+
+                # Compare keywords (as sets of keyword entries)
+                existing_keywords = {kw.entry for kw in existing_dataset.keyword}
+                new_keywords = set(kw.entry for kw in keyword_entries)
+                if existing_keywords != new_keywords:
+                    existing_dataset.keyword = keyword_entries
+                    changed = True
+
+                # Compare authors (as sets of author names)
+                existing_authors = {author.name for author in existing_dataset.author}
+                new_authors = {author.name for author in authors}
+                if existing_authors != new_authors:
+                    existing_dataset.author = authors
+                    changed = True
+
+                if changed:
+                    session.add(existing_dataset)
+                    session.commit()
+                    updated_count += 1
+                else:
+                    ignored_count += 1
+
+    logger.info("Completed creating datasets tables.")
+    logger.info(f"Entries created: {created_count}")
+    logger.info(f"Entries updated: {updated_count}")
+    logger.info(
+        f"Entries ignored because they already exist in the database: {ignored_count}"
+        )
 
 # ============================================================================
 # File, FileType
@@ -217,6 +382,8 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
 
     We need to handle the FileType, Dataset, and recursive File relationships.
     """
+    logger.info("Starting to create files tables: FileType, File, Software.")
+
     # Create a dictionary to store files by their name (if they are zip files)
     parent_files_by_name = {} # key: (dataset_id, file_name), value: File file_id
 
@@ -246,9 +413,9 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                 )
             dataset_obj = session.exec(statement).first()
             if not dataset_obj:
-                print(
-                    f"Dataset with id_in_origin {dataset_id_in_origin}"
-                    f"and origin {dataset_origin} not found."
+                logger.debug(
+                    f"Dataset with id_in_origin {dataset_id_in_origin}",
+                    f" and origin {dataset_origin} not found."
                     )
                 continue  # Skip if not found
 
@@ -324,52 +491,14 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
 # Thermostat, Barostat, Integrator
 # ============================================================================
 
-TOPOLOGY_FILES = gro_data[[
-    'dataset_origin',
-    'dataset_id',
-    'file_name',
-    'atom_number',
-    'has_protein',
-    'has_nucleic',
-    'has_lipid',
-    'has_glucid',
-    "has_water_ion"
-    ]].rename(columns={
-        'file_name': 'name'
-        })
+def load_topology_data(parquet_path_topology: str) -> pd.DataFrame:
+    """Load parquet file and return DataFrame with selected columns.
 
-PARAMETER_FILES = mdp_data[[
-    'dataset_origin',
-    'dataset_id',
-    'file_name',
-    'dt',
-    'nsteps',
-    'temperature'
-    ]].rename(columns={
-        'file_name': 'name'
-        })
+    Rename columns to match the SQLModel table columns.
+    """
+    topology_df = pd.read_parquet(parquet_path_topology)
 
-TRAJECTORY_FILES = xtc_data[[
-    'dataset_origin',
-    'dataset_id',
-    'file_name',
-    'atom_number',
-    'frame_number'
-    ]].rename(columns={
-        'file_name': 'name'
-        })
-
-def load_simulation_files_data(
-        parquet_path_topology: str,
-        parquet_path_parameter:str,
-        parquet_path_trajectory:str
-        ) -> pd.DataFrame:
-
-    df_topology = pd.read_parquet(parquet_path_topology)
-    df_parameter = pd.read_parquet(parquet_path_parameter)
-    df_trajectory = pd.read_parquet(parquet_path_trajectory)
-
-    df_topology = df_topology[[
+    topology_df = topology_df[[
         'dataset_origin',
         'dataset_id',
         'file_name',
@@ -380,61 +509,325 @@ def load_simulation_files_data(
         'has_glucid',
         "has_water_ion"
         ]].rename(columns={
+            'dataset_id': 'dataset_id_in_origin',
             'file_name': 'name'
             })
 
-    df_parameter = df_parameter[[
+    return topology_df
+
+def load_parameter_data(parquet_path_parameters: str) -> pd.DataFrame:
+    """Load parquet file and return DataFrame with selected columns.
+
+    Rename columns to match the SQLModel table columns.
+    """
+    parameter_df = pd.read_parquet(parquet_path_parameters)
+
+    parameter_df = parameter_df[[
         'dataset_origin',
         'dataset_id',
         'file_name',
         'dt',
         'nsteps',
-        'temperature'
+        'temperature',
+        'thermostat',
+        'barostat',
+        'integrator'
         ]].rename(columns={
+            'dataset_id': 'dataset_id_in_origin',
             'file_name': 'name'
             })
 
-    df_trajectory = df_trajectory[[
-        'dataset_origin',
-        'dataset_id',
-        'file_name',
-        'atom_number',
-        'frame_number'
-        ]].rename(columns={
-            'file_name': 'name'
-            })
+    return parameter_df
 
-    pass
+def load_trajectory_data(parquet_path_trajectory: str) -> pd.DataFrame:
+    """Load parquet file and return DataFrame with selected columns.
 
-def create_simulation_tables():
-    pass
+    Rename columns to match the SQLModel table columns.
+    """
+    trajectory_df = pd.read_parquet(parquet_path_trajectory)
+
+    trajectory_df = trajectory_df[[
+    'dataset_origin',
+    'dataset_id',
+    'file_name',
+    'atom_number',
+    'frame_number'
+    ]].rename(columns={
+        'dataset_id': 'dataset_id_in_origin',
+        'file_name': 'name'
+        })
+
+    return trajectory_df
+
+def create_topology_table(topology_df: pd.DataFrame, engine: Engine) -> None:
+    """Create the TopologyFile records in the database."""
+
+    with Session(engine) as session:
+        for _, row in topology_df.iterrows():
+
+            dataset_id_in_origin = row["dataset_id_in_origin"]
+            dataset_origin = row["dataset_origin"]
+            statement_dataset = select(Dataset).join(DatasetOrigin).where(
+                Dataset.id_in_origin == dataset_id_in_origin,
+                DatasetOrigin.name == dataset_origin
+                )
+            dataset_obj = session.exec(statement_dataset).first()
+            if not dataset_obj:
+                print(
+                    f"Dataset with id_in_origin {dataset_id_in_origin}"
+                    f" and origin {dataset_origin} not found."
+                    )
+                continue  # Skip if not found
+            dataset_id = dataset_obj.dataset_id
+
+            gro_file_name = row["name"]
+            statement_file = select(File).join(FileType).where(
+                # Here we filter out the .gro files to go faster but when
+                # we'll have more than just .gro files in the topology table,
+                # we'll remove this or refine
+                FileType.name == "gro",
+                File.name == gro_file_name,
+                File.dataset_id == dataset_id
+            )
+            file_obj = session.exec(statement_file).first()
+            if not file_obj:
+                print(
+                    f"File with dataset_id {dataset_obj.dataset_id}"
+                    f" and file name {gro_file_name} not found."
+                    )
+                continue  # Skip if not found
+            file_id_in_files = file_obj.file_id
+
+
+            # -- Create the TopologyFile --
+            topology_obj = TopologyFile(
+                file_id=file_id_in_files,
+                atom_number=row["atom_number"],
+                has_protein=row["has_protein"],
+                has_nucleic=row["has_nucleic"],
+                has_lipid=row["has_lipid"],
+                has_glucid=row["has_glucid"],
+                has_water_ion=row["has_water_ion"]
+            )
+
+            session.add(topology_obj)
+            session.commit()
+
+
+def create_parameters_table(param_df: pd.DataFrame, engine: Engine) -> None:
+    """
+    Create the ParameterFile records in the database.
+    At the same time, create the Thermostat, Barostat, and Integrator records.
+    """
+
+    with Session(engine) as session:
+        for _, row in param_df.iterrows():
+
+            dataset_id_in_origin = row["dataset_id_in_origin"]
+            dataset_origin = row["dataset_origin"]
+            statement = select(Dataset).join(DatasetOrigin).where(
+                Dataset.id_in_origin == dataset_id_in_origin,
+                DatasetOrigin.name == dataset_origin
+                )
+            dataset_obj = session.exec(statement).first()
+            if not dataset_obj:
+                print(
+                    f"Dataset with id_in_origin {dataset_id_in_origin}"
+                    f" and origin {dataset_origin} not found."
+                    )
+                continue  # Skip if not found
+            dataset_id = dataset_obj.dataset_id
+
+            mdp_file_name = row["name"]
+            statement_file = select(File).join(FileType).where(
+                # Here we filter out the .mdp files to go faster but when
+                # we'll have more than just .mdp files in the parameters table,
+                # we'll remove this or refine
+                FileType.name == "mdp",
+                File.name == mdp_file_name,
+                File.dataset_id == dataset_id
+            )
+            file_obj = session.exec(statement_file).first()
+            if not file_obj:
+                print(
+                    f"File with dataset_id {dataset_obj.dataset_id}"
+                    f" and file name {mdp_file_name} not found."
+                    )
+                continue  # Skip if not found
+            file_id_in_files = file_obj.file_id
+
+
+            # -- Handle Thermostat, Barostat, Integrator --
+            # Thermostat
+            thermostat = row.get("thermostat", None)
+            statement_thermostat = select(Thermostat).where(
+                Thermostat.name == thermostat
+                )
+            thermostat_obj = session.exec(statement_thermostat).first()
+            if not thermostat_obj:
+                thermostat_obj = Thermostat(name=thermostat)
+                session.add(thermostat_obj)
+                session.commit()
+                session.refresh(thermostat_obj)
+
+            # Barostat
+            barostat = row.get("barostat", None)
+            statement_barostat = select(Barostat).where(
+                Barostat.name == barostat
+                )
+            barostat_obj = session.exec(statement_barostat).first()
+            if not barostat_obj:
+                barostat_obj = Barostat(name=barostat)
+                session.add(barostat_obj)
+                session.commit()
+                session.refresh(barostat_obj)
+
+            # Integrator
+            integrator = row.get("integrator", None)
+            statement_integrator = select(Integrator).where(
+                Integrator.name == integrator
+                )
+            integrator_obj = session.exec(statement_integrator).first()
+            if not integrator_obj:
+                integrator_obj = Integrator(name=integrator)
+                session.add(integrator_obj)
+                session.commit()
+                session.refresh(integrator_obj)
+
+
+            # -- Create the ParameterFile --
+            parameter_obj = ParameterFile(
+                file_id=file_id_in_files,
+                dt=row["dt"],
+                nsteps=row["nsteps"],
+                temperature=row["temperature"],
+                thermostat_id=thermostat_obj.thermostat_id,
+                barostat_id=barostat_obj.barostat_id,
+                integrator_id=integrator_obj.integrator_id
+            )
+
+            session.add(parameter_obj)
+            session.commit()
+
+
+def create_trajectory_table(traj_df: pd.DataFrame, engine: Engine) -> None:
+    """Create the TrajectoryFile records in the database."""
+
+    with Session(engine) as session:
+        missing_files = 0
+        for index, row in traj_df.iterrows():
+            xtc_file_name = row["name"]
+
+            dataset_id_in_origin = row["dataset_id_in_origin"]
+            dataset_origin = row["dataset_origin"]
+            statement = select(Dataset).join(DatasetOrigin).where(
+                Dataset.id_in_origin == dataset_id_in_origin,
+                DatasetOrigin.name == dataset_origin
+                )
+            dataset_obj = session.exec(statement).first()
+            if not dataset_obj:
+                logger.debug(
+                    f"Dataset with id_in_origin {dataset_id_in_origin}"
+                    f" and origin {dataset_origin} not found.\n",
+                    f"Skipping {xtc_file_name} (index: {index})..."
+                    )
+                missing_files += 1
+                continue  # Skip if not found
+            dataset_id = dataset_obj.dataset_id
+
+            statement_file = select(File).join(FileType).where(
+                # Here we filter out the .xtc files to go faster but when
+                # we'll have more than just .xtc files in the trajectory table,
+                # we'll remove this or refine
+                FileType.name == "xtc",
+                File.name == xtc_file_name,
+                File.dataset_id == dataset_id
+            )
+            file_obj = session.exec(statement_file).first()
+            if not file_obj:
+                logger.debug(
+                    f"File with dataset_id {dataset_obj.dataset_id}"
+                    f" and file name {xtc_file_name} not found.\n",
+                    f"Skipping {xtc_file_name} (index: {index})..."
+                    )
+                missing_files += 1
+                continue  # Skip if not found
+            file_id_in_files = file_obj.file_id
+
+
+            # -- Create the TrajectoryFile --
+            traj_obj = TrajectoryFile(
+                file_id=file_id_in_files,
+                atom_number=row["atom_number"],
+                frame_number=row["frame_number"]
+            )
+
+            session.add(traj_obj)
+            session.commit()
+    logger.info("Completed creating trajectory table.")
+    logger.debug(f"Number of missing files: {missing_files}")
+
+
+def delete_simulation_tables():
+    with Session(engine) as session:
+        statement = select(TopologyFile)
+        topology_files = session.exec(statement).all()
+        for topology_file in topology_files:
+            session.delete(topology_file)
+
+        statement = select(ParameterFile)
+        parameter_files = session.exec(statement).all()
+        for parameter_file in parameter_files:
+            session.delete(parameter_file)
+        session.commit()
+
+        statement = select(TrajectoryFile)
+        trajectory_files = session.exec(statement).all()
+        for trajectory_file in trajectory_files:
+            session.delete(trajectory_file)
+        session.commit()
 
 # ============================================================================
 
 def data_ingestion():
     start_1 = time.perf_counter()
-    start_3 = time.perf_counter()
+    start_4 = time.perf_counter()
 
     # Load the datasets data
     datasets_df = load_datasets_data(datasets_path)
     create_datasets_tables(datasets_df, engine)
-    execution_time = time.perf_counter() - start_1
-    print(f"Datasets ingestion time: {execution_time:.2f} seconds\n")
+    execution_time_1 = time.perf_counter() - start_1
+    logger.info(f"Datasets ingestion time: {execution_time_1:.2f} seconds\n")
 
-    start_2 = time.perf_counter()
+    # start_2 = time.perf_counter()
 
-    # Load the files data
-    files_df = load_files_data(files_path)
-    create_files_tables(files_df, engine)
-    execution_time = time.perf_counter() - start_2
-    print(f"Files ingestion time: {execution_time:.2f} seconds\n")
+    # # Load the files data
+    # files_df = load_files_data(files_path)
+    # create_files_tables(files_df, engine)
+    # execution_time_2 = time.perf_counter() - start_2
+    # print(f"Files ingestion time: {execution_time_2:.2f} seconds\n")
 
+    # # delete_simulation_tables()
 
-    # Create the simulation tables
-    # create_simulation_tables()
-    execution_time = time.perf_counter() - start_3
-    print(f"Data ingestion time: {execution_time:.2f} seconds")
-    print("Data ingestion complete.")
+    # start_3 = time.perf_counter()
+
+    # # Create the topology, parameters, and trajectory tables
+    # topology_df = load_topology_data(gro_path)
+    # parameter_df = load_parameter_data(mdp_path)
+    # trajectory_df = load_trajectory_data(xtc_path)
+
+    # create_trajectory_table(trajectory_df, engine)
+    # create_parameters_table(parameter_df, engine)
+    # create_topology_table(topology_df, engine)
+
+    # execution_time_3 = time.perf_counter() - start_3
+    # print(f"Simulation files ingestion time: {execution_time_3:.2f} seconds\n")
+
+    # Measure the total execution time
+    execution_time_4 = time.perf_counter() - start_4
+    logger.info(f"Data ingestion time: {execution_time_4:.2f} seconds")
+    logger.info("Data ingestion complete.")
+    pass
 
 if __name__ == "__main__":
     data_ingestion()
