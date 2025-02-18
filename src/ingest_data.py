@@ -246,12 +246,10 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
 
             # --- Check if the Dataset already exists ---
             # Uniqueness is determined by (origin, id_in_origin)
-            dataset_id_in_origin = row["id_in_origin"]
-            dataset_origin = row["dataset_origin"]
-            dataset_stmt = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin
-                )
+            dataset_stmt = select(Dataset).where(
+                (Dataset.id_in_origin == row["id_in_origin"]) &
+                (Dataset.origin_id == origin_obj.origin_id)
+            )
             existing_dataset = session.exec(dataset_stmt).first()
 
             if not existing_dataset: # If the dataset doesn't exist, create it.
@@ -324,16 +322,20 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                         changed = True # Mark the dataset as changed
 
                 # Compare keywords (as sets of keyword entries)
-                existing_keywords = {kw.entry for kw in existing_dataset.keyword} # Keywords in the database
-                new_keywords = {kw.entry for kw in keyword_entries} # Keywords in the current row
+                # Keywords in the database
+                existing_keywords = {kw.entry for kw in existing_dataset.keyword}
+                # Keywords in the current row
+                new_keywords = {kw.entry for kw in keyword_entries}
 
                 if existing_keywords != new_keywords:
                     existing_dataset.keyword = keyword_entries
                     changed = True
 
                 # Compare authors (as sets of author names)
-                existing_authors = {author.name for author in existing_dataset.author} # Authors in the database
-                new_authors = {author.name for author in authors} # Authors in the current row
+                # Authors in the database
+                existing_authors = {author.name for author in existing_dataset.author}
+                # Authors in the current row
+                new_authors = {author.name for author in authors}
 
                 if existing_authors != new_authors:
                     existing_dataset.author = authors
@@ -347,7 +349,7 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                 else:
                     ignored_count += 1
 
-    logger.info("Completed creating datasets tables.")
+    logger.success("Completed creating datasets tables.")
     logger.info(f"Entries created: {created_count}")
     logger.info(f"Entries updated: {updated_count}")
     logger.info(
@@ -393,13 +395,24 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
 
     We need to handle the FileType, Dataset, and recursive File relationships.
     """
+    total_rows = len(files_df)
     logger.info("Starting to create files tables: FileType, File, Software.")
+
+    # Counters for the number of records created, updated, or ignored.
+    created_count = 0
+    updated_count = 0
+    ignored_count = 0
 
     # Create a dictionary to store files by their name (if they are zip files)
     parent_files_by_name = {} # key: (dataset_id, file_name), value: File file_id
 
     with Session(engine) as session:
-        for _, row in files_df.iterrows():
+        for _, row in tqdm(
+            files_df.iterrows(),
+            total=total_rows,
+            desc="Processing rows",
+            unit="row"
+            ):
 
             # --- Handle FileType (one-to-many relationship) ---
             file_type_name = row["type"]
@@ -448,8 +461,11 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                 parent_zip_file_id = parent_files_by_name.get(key, None)
 
                 if not parent_zip_file_id:
-                    print("Parent file not found in cache.")
-                    print("Searching in the database...")
+                    logger.debug(
+                        f"Parent file with dataset id {dataset_obj.dataset_id}",
+                        f" and file name {parent_zip_file_name} not found in cache.")
+                    logger.debug("Searching in the database...")
+
                     # Option 2: Query the DB using both the file name and dataset id.
                     parent_statement = (
                         select(File)
@@ -464,7 +480,7 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                         # Cache the found parent file for later use.
                         parent_files_by_name[key] = parent_obj
                     else:
-                        print(
+                        logger.error(
                             f"Parent file '{parent_zip_file_name}' not found for child"
                             f"'{row['name']}' with dataset_id {dataset_obj.dataset_id}."
                             )
@@ -473,29 +489,84 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
             # We can simply leave it as None (or set to a default value if needed)
             software_id = None
 
-            file_obj = File(
-                name=row["name"],
-                size_in_bytes=row["size_in_bytes"],
-                md5=row["md5"],
-                url=row["url"],
-                is_from_zip_file=row["is_from_zip_file"],
-                software_id=software_id,
-                # use the integer id from the Dataset record
-                dataset_id=dataset_obj.dataset_id,
-                # use the file type id from FileType record
-                file_type_id=type_obj.file_type_id,
-                parent_zip_file_id = parent_zip_file_id
+            # --- Check if the File record already exists ---
+            # Uniqueness is determined by the file's name and the dataset_id associated.
+            file_stmt = select(File).where(
+                File.name == row["name"],
+                File.dataset_id == dataset_obj.dataset_id
             )
+            existing_file = session.exec(file_stmt).first()
 
-            session.add(file_obj)
-            session.commit()
-            session.refresh(file_obj)
+            if not existing_file:
+                # File does not exist: create a new record.
+                new_file_obj = File(
+                    name=row["name"],
+                    size_in_bytes=row["size_in_bytes"],
+                    md5=row["md5"],
+                    url=row["url"],
+                    is_from_zip_file=row["is_from_zip_file"],
+                    software_id=software_id,
+                    # use the integer id from the Dataset record
+                    dataset_id=dataset_obj.dataset_id,
+                    # use the file type id from FileType record
+                    file_type_id=type_obj.file_type_id,
+                    parent_zip_file_id = parent_zip_file_id
+                )
 
-            # If this file is a parent file (i.e. not extracted from a zip),
-            # then store it in the cache using its dataset_id and name.
-            if not row["is_from_zip_file"] and type_obj.name == "zip":
-                key = (dataset_obj.dataset_id, row["name"])
-                parent_files_by_name[key] = file_obj.file_id
+                session.add(new_file_obj)
+                session.commit()
+                session.refresh(new_file_obj)
+                created_count += 1
+
+                # If this file is a parent file (i.e. not extracted from a zip),
+                # then store it in the cache using its dataset_id and name.
+                if not row["is_from_zip_file"] and type_obj.name == "zip":
+                    key = (dataset_obj.dataset_id, row["name"])
+                    parent_files_by_name[key] = new_file_obj.file_id
+                
+            else:
+                # File exists: compare fields to decide whether to update or ignore.
+                changed = False # We don't know yet if the file has changed info.
+
+                # List of simple fields to compare.
+                fields_to_check = [
+                    "size_in_bytes",
+                    "md5",
+                    "url",
+                    "is_from_zip_file",
+                ]
+                for field in fields_to_check:
+                    new_value = row[field]
+                    current_value = getattr(existing_file, field)
+                    if new_value != current_value:
+                        setattr(existing_file, field, new_value)
+                        changed = True
+
+                # Check related or derived fields.
+                if existing_file.file_type_id != type_obj.file_type_id:
+                    existing_file.file_type_id = type_obj.file_type_id
+                    changed = True
+                if existing_file.software_id != software_id:
+                    existing_file.software_id = software_id
+                    changed = True
+                if existing_file.parent_zip_file_id != parent_zip_file_id:
+                    existing_file.parent_zip_file_id = parent_zip_file_id
+                    changed = True
+
+                if changed:
+                    session.add(existing_file)
+                    session.commit()
+                    updated_count += 1
+                else:
+                    ignored_count += 1
+
+    
+    logger.success("Completed creating files tables.")
+    logger.info(f"Entries created: {created_count}")
+    logger.info(f"Entries updated: {updated_count}")
+    logger.info(
+        f"Entries ignored because they already exist in the database: {ignored_count}"
+        )
 
 # ============================================================================
 # TopologyFile, Parameter,File, TrajectoryFile
@@ -810,13 +881,13 @@ def data_ingestion():
     execution_time_1 = time.perf_counter() - start_1
     logger.info(f"Datasets ingestion time: {execution_time_1:.2f} seconds\n")
 
-    # start_2 = time.perf_counter()
+    start_2 = time.perf_counter()
 
-    # # Load the files data
-    # files_df = load_files_data(files_path)
-    # create_files_tables(files_df, engine)
-    # execution_time_2 = time.perf_counter() - start_2
-    # print(f"Files ingestion time: {execution_time_2:.2f} seconds\n")
+    # Load the files data
+    files_df = load_files_data(files_path)
+    create_files_tables(files_df, engine)
+    execution_time_2 = time.perf_counter() - start_2
+    print(f"Files ingestion time: {execution_time_2:.2f} seconds\n")
 
     # # delete_simulation_tables()
 
