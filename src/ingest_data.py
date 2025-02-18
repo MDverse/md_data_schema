@@ -254,8 +254,8 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                 )
             existing_dataset = session.exec(dataset_stmt).first()
 
-            if not existing_dataset:
-            # --- Create the Dataset entry ---
+            if not existing_dataset: # If the dataset doesn't exist, create it.
+            # --- Create the new Dataset entry ---
                 new_dataset_obj = Dataset(
                     id_in_origin=row["id_in_origin"],
                     doi=row["doi"],
@@ -289,10 +289,11 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
 
                 session.add(new_dataset_obj)
                 session.commit()
+                created_count += 1
 
-            else:
+            else: # If the dataset already exists, update it or ignore it.
                 # Compare fields to decide whether to update or ignore.
-                changed = False
+                changed = False # We don't know yet if the dataset has changed info.
 
                 # Compare simple fields
                 fields_to_check = [
@@ -309,27 +310,37 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                 ]
 
                 for field in fields_to_check:
+                    # "new_value" is the value from the current row in the DataFrame
+                    # It doesn't mean that it's new, it's just the value we're
+                    # comparing to the existing dataset.
                     new_value = row[field]
                     current_value = getattr(existing_dataset, field)
-                    if new_value != current_value:
-                        setattr(existing_dataset, field, new_value)
-                        changed = True
+                    # This is equivalent to writing existing_dataset.field if we knew
+                    # the field name ahead of time, but since field is a variable,
+                    # getattr is used
+
+                    if new_value != current_value: # If the field has changed
+                        setattr(existing_dataset, field, new_value) # Update it
+                        changed = True # Mark the dataset as changed
 
                 # Compare keywords (as sets of keyword entries)
-                existing_keywords = {kw.entry for kw in existing_dataset.keyword}
-                new_keywords = set(kw.entry for kw in keyword_entries)
+                existing_keywords = {kw.entry for kw in existing_dataset.keyword} # Keywords in the database
+                new_keywords = {kw.entry for kw in keyword_entries} # Keywords in the current row
+
                 if existing_keywords != new_keywords:
                     existing_dataset.keyword = keyword_entries
                     changed = True
 
                 # Compare authors (as sets of author names)
-                existing_authors = {author.name for author in existing_dataset.author}
-                new_authors = {author.name for author in authors}
+                existing_authors = {author.name for author in existing_dataset.author} # Authors in the database
+                new_authors = {author.name for author in authors} # Authors in the current row
+
                 if existing_authors != new_authors:
                     existing_dataset.author = authors
                     changed = True
 
-                if changed:
+
+                if changed: # If changed == True, update the dataset
                     session.add(existing_dataset)
                     session.commit()
                     updated_count += 1
