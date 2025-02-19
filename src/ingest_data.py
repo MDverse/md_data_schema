@@ -136,7 +136,7 @@ def load_datasets_data(parquet_path: str) -> pd.DataFrame:
 
     return df
 
-def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
+def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine): # ADD RETURN TYPES
     """
     Create or update dataset-related tables in the database.
 
@@ -167,6 +167,10 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
     datsets_created_count = 0
     datasets_updated_count = 0
     datasets_ignored_count = 0
+
+    datasets_ids_new = []
+    datasets_ids_unchanged = []
+    datasets_ids_deleted = []
 
     # The session is used to interact with the database—querying, adding,
     # and committing changes.
@@ -289,7 +293,9 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
 
                 session.add(new_dataset_obj)
                 session.commit()
+                session.refresh(new_dataset_obj)
                 datsets_created_count += 1
+                datasets_ids_new.append(new_dataset_obj.dataset_id)
 
             else: # If the dataset already exists, update it or ignore it.
                 # Compare fields to decide whether to update or ignore.
@@ -349,8 +355,26 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                     session.add(existing_dataset)
                     session.commit()
                     datasets_updated_count += 1
+                    datasets_ids_deleted.append(existing_dataset.dataset_id)
+                    
+                    # Delete all files associated with the existing dataset
+                    file_stmt = select(File).join(Dataset).where(
+                        File.dataset_id == existing_dataset.dataset_id
+                    )
+                    files_from_existing_dataset = session.exec(file_stmt).all()
+                    if not files_from_existing_dataset:
+                        logger.debug(
+                            f"No files found for dataset {existing_dataset.dataset_id}."
+                            )
+                        continue
+                    else:
+                        for file in files_from_existing_dataset:
+                            session.delete(file)
+                            total_files_deleted += 1
+                        session.commit()
                 else:
                     datasets_ignored_count += 1
+                    datasets_ids_unchanged.append(existing_dataset.dataset_id)
 
     logger.success("Completed creating datasets tables.")
     logger.info(f"Entries created: {datsets_created_count}")
@@ -358,6 +382,52 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
     logger.info(
         f"Entries ignored because they already exist in the database: {datasets_ignored_count}"
         )
+    
+    return datasets_ids_new, datasets_ids_unchanged, datasets_ids_deleted
+
+
+# def create_dataset_entries(
+#         dataframe_row: pd.Series,
+#         session: Session,
+#         keyword_entries: list[Keyword],
+#         authors: list[Author],
+#         origin_obj: DatasetOrigin,
+#         ) -> None:
+#     # --- Create the new Dataset entry ---
+#     new_dataset_obj = Dataset(
+#         id_in_origin=dataframe_row["id_in_origin"],
+#         doi=dataframe_row["doi"],
+#         date_created=dataframe_row["date_created"],
+#         date_last_modified=dataframe_row["date_last_modified"],
+#         date_last_crawled=dataframe_row["date_last_crawled"],
+#         file_number=dataframe_row["file_number"],
+#         download_number=dataframe_row["download_number"],
+#         view_number=dataframe_row["view_number"],
+#         license=dataframe_row["license"],
+#         url=dataframe_row["url"],
+#         title=dataframe_row["title"],
+#         # use .get() if the field might be missing
+#         keywords=dataframe_row.get("keywords"),
+#         description=dataframe_row.get("description"),
+#         origin=origin_obj,   # assign the related origin
+#     )
+
+#     # Assign the many-to-many relationship for authors:
+#     # In our Dataset model, we have defined an attribute called author
+#     # that represents a MtM relationship with the Author model.
+#     # When we write the following, we are assigning the list of Author
+#     # objects (collected in the authors list) to the dataset’s author
+#     # attribute. This informs SQLModel/SQLAlchemy to create the
+#     # appropriate link table entries so that the dataset is
+#     # related to all these authors.
+#     new_dataset_obj.author = authors
+
+#     # Assign the many-to-many relationship for keywords:
+#     new_dataset_obj.keyword = keyword_entries
+
+#     session.add(new_dataset_obj)
+#     session.commit()
+#     session.refresh(new_dataset_obj)
 
 # ============================================================================
 # File, FileType
@@ -392,8 +462,13 @@ def load_files_data(parquet_path: str) -> pd.DataFrame:
             })
     return df
 
-
-def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
+def create_files_tables(
+        files_df: pd.DataFrame,
+        engine: Engine,
+        datasets_ids_new: list[int],
+        datasets_ids_unchanged: list[int], 
+        datasets_ids_deleted: list[int],
+        ) -> None:
     """Create the FileType and File records in the database.
 
     We need to handle the FileType, Dataset, and recursive File relationships.
@@ -418,31 +493,39 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
             ):
 
             # --- Check if the File record already exists ---
-            # Uniqueness is determined by the file's name and the dataset_id associated.
-            file_stmt = select(File).join(Dataset).join(DatasetOrigin).where(
-                File.name == row["name"],
-                Dataset.id_in_origin == row["dataset_id_in_origin"],
-                DatasetOrigin.name == row["dataset_origin"]
+            dataset_id_in_origin = row["dataset_id_in_origin"]
+            dataset_origin = row["dataset_origin"]
+            dataset_stmt = select(Dataset).join(DatasetOrigin).where(
+                Dataset.id_in_origin == dataset_id_in_origin,
+                DatasetOrigin.name == dataset_origin,
             )
-            existing_file = session.exec(file_stmt).first()
-
-            if not existing_file:
-                # File does not exist: create a new record with everything associated
-
-                # --- Handle Dataset (one-to-many relationship) ---
-                dataset_id_in_origin = row["dataset_id_in_origin"]
-                dataset_origin = row["dataset_origin"]
-                statement = select(Dataset).join(DatasetOrigin).where(
-                    Dataset.id_in_origin == dataset_id_in_origin,
-                    DatasetOrigin.name == dataset_origin
-                    )
-                dataset_obj = session.exec(statement).first()
-                if not dataset_obj:
+            current_dataset = session.exec(dataset_stmt).first()
+            if not current_dataset:
                     logger.debug(
                         f"Dataset with id_in_origin {dataset_id_in_origin}",
                         f" and origin {dataset_origin} not found."
                         )
                     continue  # Skip if not found
+
+            # # If there's no file from this dataset, it means that the files
+            # # are new or were deleted previously
+            # file_stmt = select(File).where(
+            #     File.dataset_id == current_dataset.dataset_id,
+            # )
+            # existing_file = session.exec(file_stmt).first()
+
+            existing_file = True
+            if current_dataset.dataset_id in datasets_ids_new:
+                # If the dataset is new, then all files are new
+                existing_file = False
+            
+            if current_dataset.dataset_id in datasets_ids_deleted:
+                # If the dataset was deleted, then all files are new
+                existing_file = False
+
+
+            if not existing_file:
+                # File does not exist: create a new record with everything associated
 
                 # --- Handle FileType (one-to-many relationship) ---
                 file_type_name = row["type"]
@@ -468,14 +551,14 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                 if row["is_from_zip_file"] and parent_zip_file_name:
                     # Construct a key that combines the dataset id and parent's file name.
                     # Takes the dataset_id of the child file and the parent zip file_name
-                    key = (dataset_obj.dataset_id, parent_zip_file_name)
+                    key = (current_dataset.dataset_id, parent_zip_file_name)
 
                     # Option 1: Check if we have already found the parent file in the cache.
                     parent_zip_file_id = parent_files_by_name.get(key, None)
 
                     if not parent_zip_file_id:
                         logger.debug(
-                            f"Parent file with dataset id {dataset_obj.dataset_id}",
+                            f"Parent file with dataset id {current_dataset.dataset_id}",
                             f" and file name {parent_zip_file_name} not found in cache.")
                         logger.debug("Searching in the database...")
 
@@ -485,7 +568,7 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                             # Find the parent file by name
                             .where(File.name == parent_zip_file_name)
                             # Make sure it's in the same dataset_id as the child file
-                            .where(File.dataset_id == dataset_obj.dataset_id)
+                            .where(File.dataset_id == current_dataset.dataset_id)
                         )
                         parent_obj = session.exec(parent_statement).first()
                         if parent_obj:
@@ -495,7 +578,7 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                         else:
                             logger.error(
                                 f"Parent file '{parent_zip_file_name}' not found for child"
-                                f"'{row['name']}' with dataset_id {dataset_obj.dataset_id}."
+                                f"'{row['name']}' with dataset_id {current_dataset.dataset_id}."
                                 )
 
                 # --- Handle Software (which we have no data for currently 11/02/2025) ---
@@ -510,7 +593,7 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                     is_from_zip_file=row["is_from_zip_file"],
                     software_id=software_id,
                     # use the integer id from the Dataset record
-                    dataset_id=dataset_obj.dataset_id,
+                    dataset_id=current_dataset.dataset_id,
                     # use the file type id from FileType record
                     file_type_id=type_obj.file_type_id,
                     parent_zip_file_id = parent_zip_file_id
@@ -518,44 +601,21 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
 
                 session.add(new_file_obj)
                 session.commit()
-                session.refresh(new_file_obj)
+                session.refresh(new_file_obj) # Refresh because we need the file_id for the parent zip file
                 files_created_count += 1
 
                 # If this file is a parent file (i.e. not extracted from a zip),
                 # then store it in the cache using its dataset_id and name.
                 if not row["is_from_zip_file"] and type_obj.name == "zip":
-                    key = (dataset_obj.dataset_id, row["name"])
+                    key = (current_dataset.dataset_id, row["name"])
                     parent_files_by_name[key] = new_file_obj.file_id
                 
             else:
-                # File exists: compare fields to decide whether to update or ignore.
-                changed = False # We don't know yet if the file has changed info.
-
-                # List of simple fields to compare.
-                fields_to_check = [
-                    "size_in_bytes",
-                    "md5",
-                    "url",
-                    "is_from_zip_file",
-                ]
-                for field in fields_to_check:
-                    new_value = row[field]
-                    current_value = getattr(existing_file, field)
-                    if new_value != current_value:
-                        setattr(existing_file, field, new_value)
-                        changed = True
-
-                if changed:
-                    session.add(existing_file)
-                    session.commit()
-                    files_updated_count += 1
-                else:
-                    files_ignored_count += 1
-
+                # File exists: we ignore it.
+                files_ignored_count += 1
     
     logger.success("Completed creating files tables.")
     logger.info(f"Entries created: {files_created_count}")
-    logger.info(f"Entries updated: {files_updated_count}")
     logger.info(
         f"Entries ignored because they already exist in the database: {files_ignored_count}"
         )
@@ -633,6 +693,7 @@ def load_trajectory_data(parquet_path_trajectory: str) -> pd.DataFrame:
 
     return trajectory_df
 
+
 def create_topology_table(topology_df: pd.DataFrame, engine: Engine) -> None:
     """Create the TopologyFile records in the database."""
 
@@ -686,7 +747,6 @@ def create_topology_table(topology_df: pd.DataFrame, engine: Engine) -> None:
 
             session.add(topology_obj)
             session.commit()
-
 
 def create_parameters_table(param_df: pd.DataFrame, engine: Engine) -> None:
     """
@@ -783,7 +843,6 @@ def create_parameters_table(param_df: pd.DataFrame, engine: Engine) -> None:
             session.add(parameter_obj)
             session.commit()
 
-
 def create_trajectory_table(traj_df: pd.DataFrame, engine: Engine) -> None:
     """Create the TrajectoryFile records in the database."""
 
@@ -869,7 +928,7 @@ def data_ingestion():
 
     # Load the datasets data
     datasets_df = load_datasets_data(datasets_path)
-    create_datasets_tables(datasets_df, engine)
+    new_datasets, unchanged_datasets, deleted_datasets = create_datasets_tables(datasets_df, engine)
     execution_time_1 = time.perf_counter() - start_1
     logger.info(f"Datasets ingestion time: {execution_time_1:.2f} seconds\n")
 
@@ -877,11 +936,11 @@ def data_ingestion():
 
     # Load the files data
     files_df = load_files_data(files_path)
-    create_files_tables(files_df, engine)
+    create_files_tables(files_df, engine, new_datasets, unchanged_datasets, deleted_datasets)
     execution_time_2 = time.perf_counter() - start_2
     print(f"Files ingestion time: {execution_time_2:.2f} seconds\n")
 
-    # # delete_simulation_tables()
+    # delete_simulation_tables()
 
     # start_3 = time.perf_counter()
 
