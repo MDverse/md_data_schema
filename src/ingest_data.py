@@ -25,15 +25,17 @@ from models import (
 )
 
 logger.remove()
+# Terminal format
 logger.add(sys.stderr,
            format="{time:MMMM D, YYYY - HH:mm:ss} | <lvl>{level} --- {message}</lvl>",
-           level="INFO"
+           level="DEBUG"
            )
 
+# Log file format
 # Log file will be erased at each run
 # Remove mode="w" to keep log file between runs
 logger.add(f"{Path(__file__).stem}.log", mode="w",
-           format="{time:MMMM D, YYYY - HH:mm:ss} | <lvl>{level} --- {message}</lvl>",
+           format="{time:} | <lvl>{level} | {message}</lvl>",
            level="DEBUG"
            )
 
@@ -162,9 +164,9 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
         )
 
     # Counters for the number of records created, updated, or ignored.
-    created_count = 0
-    updated_count = 0
-    ignored_count = 0
+    datsets_created_count = 0
+    datasets_updated_count = 0
+    datasets_ignored_count = 0
 
     # The session is used to interact with the database—querying, adding,
     # and committing changes.
@@ -287,7 +289,7 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
 
                 session.add(new_dataset_obj)
                 session.commit()
-                created_count += 1
+                datsets_created_count += 1
 
             else: # If the dataset already exists, update it or ignore it.
                 # Compare fields to decide whether to update or ignore.
@@ -300,11 +302,12 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                     "date_last_modified",
                     "date_last_crawled",
                     "file_number",
-                    "download_number",
-                    "view_number",
+                    # "download_number",
+                    # "view_number",
                     "license",
                     "url",
                     "title",
+                    'description',
                 ]
 
                 for field in fields_to_check:
@@ -345,15 +348,15 @@ def create_datasets_tables(datasets_df: pd.DataFrame, engine: Engine)-> None:
                 if changed: # If changed == True, update the dataset
                     session.add(existing_dataset)
                     session.commit()
-                    updated_count += 1
+                    datasets_updated_count += 1
                 else:
-                    ignored_count += 1
+                    datasets_ignored_count += 1
 
     logger.success("Completed creating datasets tables.")
-    logger.info(f"Entries created: {created_count}")
-    logger.info(f"Entries updated: {updated_count}")
+    logger.info(f"Entries created: {datsets_created_count}")
+    logger.info(f"Entries updated: {datasets_updated_count}")
     logger.info(
-        f"Entries ignored because they already exist in the database: {ignored_count}"
+        f"Entries ignored because they already exist in the database: {datasets_ignored_count}"
         )
 
 # ============================================================================
@@ -399,9 +402,9 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
     logger.info("Starting to create files tables: FileType, File, Software.")
 
     # Counters for the number of records created, updated, or ignored.
-    created_count = 0
-    updated_count = 0
-    ignored_count = 0
+    files_created_count = 0
+    files_updated_count = 0
+    files_ignored_count = 0
 
     # Create a dictionary to store files by their name (if they are zip files)
     parent_files_by_name = {} # key: (dataset_id, file_name), value: File file_id
@@ -414,91 +417,91 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
             unit="row"
             ):
 
-            # --- Handle FileType (one-to-many relationship) ---
-            file_type_name = row["type"]
-            statement = select(FileType).where(
-                FileType.name == file_type_name
-                )
-            type_obj = session.exec(statement).first()
-
-            if not type_obj:
-                type_obj = FileType(name=file_type_name)
-                session.add(type_obj)
-                session.commit()
-                session.refresh(type_obj)
-
-
-            # --- Handle Dataset (one-to-many relationship) ---
-            dataset_id_in_origin = row["dataset_id_in_origin"]
-            dataset_origin = row["dataset_origin"]
-            statement = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin
-                )
-            dataset_obj = session.exec(statement).first()
-            if not dataset_obj:
-                logger.debug(
-                    f"Dataset with id_in_origin {dataset_id_in_origin}",
-                    f" and origin {dataset_origin} not found."
-                    )
-                continue  # Skip if not found
-
-
-            # --- Handle Recursive File (parent-child relationship) ---
-            # We have a column "parent_zip_file_name".
-            # For files that are from a zip file, use this to find
-            # the parent file file_id.
-            parent_zip_file_name = row.get("parent_zip_file_name", None)
-            parent_zip_file_id = None  # default is None
-
-            # If the file is from a zip file, we need to find the parent file file_id
-            if row["is_from_zip_file"] and parent_zip_file_name:
-                # Construct a key that combines the dataset id and parent's file name.
-                # Takes the dataset_id of the child file and the parent zip file_name
-                key = (dataset_obj.dataset_id, parent_zip_file_name)
-
-                # Option 1: Check if we have already found the parent file in the cache.
-                parent_zip_file_id = parent_files_by_name.get(key, None)
-
-                if not parent_zip_file_id:
-                    logger.debug(
-                        f"Parent file with dataset id {dataset_obj.dataset_id}",
-                        f" and file name {parent_zip_file_name} not found in cache.")
-                    logger.debug("Searching in the database...")
-
-                    # Option 2: Query the DB using both the file name and dataset id.
-                    parent_statement = (
-                        select(File)
-                        # Find the parent file by name
-                        .where(File.name == parent_zip_file_name)
-                        # Make sure it's in the same dataset_id as the child file
-                        .where(File.dataset_id == dataset_obj.dataset_id)
-                    )
-                    parent_obj = session.exec(parent_statement).first()
-                    if parent_obj:
-                        parent_zip_file_id = parent_obj.file_id
-                        # Cache the found parent file for later use.
-                        parent_files_by_name[key] = parent_obj
-                    else:
-                        logger.error(
-                            f"Parent file '{parent_zip_file_name}' not found for child"
-                            f"'{row['name']}' with dataset_id {dataset_obj.dataset_id}."
-                            )
-
-            # --- Handle Software (which we have no data for currently 11/02/2025) ---
-            # We can simply leave it as None (or set to a default value if needed)
-            software_id = None
-
             # --- Check if the File record already exists ---
             # Uniqueness is determined by the file's name and the dataset_id associated.
-            file_stmt = select(File).where(
+            file_stmt = select(File).join(Dataset).join(DatasetOrigin).where(
                 File.name == row["name"],
-                File.dataset_id == dataset_obj.dataset_id
+                Dataset.id_in_origin == row["dataset_id_in_origin"],
+                DatasetOrigin.name == row["dataset_origin"]
             )
             existing_file = session.exec(file_stmt).first()
 
             if not existing_file:
-                # File does not exist: create a new record.
+                # File does not exist: create a new record with everything associated
+
+                # --- Handle Dataset (one-to-many relationship) ---
+                dataset_id_in_origin = row["dataset_id_in_origin"]
+                dataset_origin = row["dataset_origin"]
+                statement = select(Dataset).join(DatasetOrigin).where(
+                    Dataset.id_in_origin == dataset_id_in_origin,
+                    DatasetOrigin.name == dataset_origin
+                    )
+                dataset_obj = session.exec(statement).first()
+                if not dataset_obj:
+                    logger.debug(
+                        f"Dataset with id_in_origin {dataset_id_in_origin}",
+                        f" and origin {dataset_origin} not found."
+                        )
+                    continue  # Skip if not found
+
+                # --- Handle FileType (one-to-many relationship) ---
+                file_type_name = row["type"]
+                statement = select(FileType).where(
+                    FileType.name == file_type_name
+                    )
+                type_obj = session.exec(statement).first()
+
+                if not type_obj:
+                    type_obj = FileType(name=file_type_name)
+                    session.add(type_obj)
+                    session.commit()
+                    session.refresh(type_obj)
+
+                # --- Handle Recursive File (parent-child relationship) ---
+                # We have a column "parent_zip_file_name".
+                # For files that are from a zip file, use this to find
+                # the parent file file_id.
+                parent_zip_file_name = row.get("parent_zip_file_name", None)
+                parent_zip_file_id = None  # default is None
+
+                # If the file is from a zip file, we need to find the parent file file_id
+                if row["is_from_zip_file"] and parent_zip_file_name:
+                    # Construct a key that combines the dataset id and parent's file name.
+                    # Takes the dataset_id of the child file and the parent zip file_name
+                    key = (dataset_obj.dataset_id, parent_zip_file_name)
+
+                    # Option 1: Check if we have already found the parent file in the cache.
+                    parent_zip_file_id = parent_files_by_name.get(key, None)
+
+                    if not parent_zip_file_id:
+                        logger.debug(
+                            f"Parent file with dataset id {dataset_obj.dataset_id}",
+                            f" and file name {parent_zip_file_name} not found in cache.")
+                        logger.debug("Searching in the database...")
+
+                        # Option 2: Query the DB using both the file name and dataset id.
+                        parent_statement = (
+                            select(File)
+                            # Find the parent file by name
+                            .where(File.name == parent_zip_file_name)
+                            # Make sure it's in the same dataset_id as the child file
+                            .where(File.dataset_id == dataset_obj.dataset_id)
+                        )
+                        parent_obj = session.exec(parent_statement).first()
+                        if parent_obj:
+                            parent_zip_file_id = parent_obj.file_id
+                            # Cache the found parent file for later use.
+                            parent_files_by_name[key] = parent_obj
+                        else:
+                            logger.error(
+                                f"Parent file '{parent_zip_file_name}' not found for child"
+                                f"'{row['name']}' with dataset_id {dataset_obj.dataset_id}."
+                                )
+
+                # --- Handle Software (which we have no data for currently 11/02/2025) ---
+                # We can simply leave it as None (or set to a default value if needed)
+                software_id = None
+
                 new_file_obj = File(
                     name=row["name"],
                     size_in_bytes=row["size_in_bytes"],
@@ -516,7 +519,7 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                 session.add(new_file_obj)
                 session.commit()
                 session.refresh(new_file_obj)
-                created_count += 1
+                files_created_count += 1
 
                 # If this file is a parent file (i.e. not extracted from a zip),
                 # then store it in the cache using its dataset_id and name.
@@ -542,30 +545,19 @@ def create_files_tables(files_df: pd.DataFrame, engine: Engine) -> None:
                         setattr(existing_file, field, new_value)
                         changed = True
 
-                # Check related or derived fields.
-                if existing_file.file_type_id != type_obj.file_type_id:
-                    existing_file.file_type_id = type_obj.file_type_id
-                    changed = True
-                if existing_file.software_id != software_id:
-                    existing_file.software_id = software_id
-                    changed = True
-                if existing_file.parent_zip_file_id != parent_zip_file_id:
-                    existing_file.parent_zip_file_id = parent_zip_file_id
-                    changed = True
-
                 if changed:
                     session.add(existing_file)
                     session.commit()
-                    updated_count += 1
+                    files_updated_count += 1
                 else:
-                    ignored_count += 1
+                    files_ignored_count += 1
 
     
     logger.success("Completed creating files tables.")
-    logger.info(f"Entries created: {created_count}")
-    logger.info(f"Entries updated: {updated_count}")
+    logger.info(f"Entries created: {files_created_count}")
+    logger.info(f"Entries updated: {files_updated_count}")
     logger.info(
-        f"Entries ignored because they already exist in the database: {ignored_count}"
+        f"Entries ignored because they already exist in the database: {files_ignored_count}"
         )
 
 # ============================================================================
@@ -907,8 +899,10 @@ def data_ingestion():
 
     # Measure the total execution time
     execution_time_4 = time.perf_counter() - start_4
-    logger.info(f"Data ingestion time: {execution_time_4:.2f} seconds")
-    logger.info("Data ingestion complete.")
+    hours, rem = divmod(execution_time_4, 3600)
+    minutes, seconds = divmod(rem, 60)
+    logger.info(f"Data ingestion time: {int(hours):02}:{int(minutes):02}:{seconds:05.2f}")
+    logger.success("Data ingestion complete.")
     pass
 
 if __name__ == "__main__":
