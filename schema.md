@@ -1,8 +1,4 @@
 ```mermaid
-    ---
-    config:
-    title: MDverse database structure
-    ---
     erDiagram
         %% Relationships between tables and join tables
         authors ||--|{ datasets_authors_link : ""
