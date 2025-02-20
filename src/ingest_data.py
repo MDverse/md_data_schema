@@ -8,8 +8,8 @@ from sqlalchemy import Engine
 from sqlmodel import Session, select
 from tqdm import tqdm
 
-from create_engine import engine
-from models import (
+from db_engine import engine
+from db_models import (
     Author,
     Barostat,
     Dataset,
