@@ -1,5 +1,6 @@
 # SQLite database files
 *.db
+*.db-journal
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -178,3 +179,6 @@ cython_debug/
 
 # Local data files
 /data/
+
+# Local test files
+/test/
