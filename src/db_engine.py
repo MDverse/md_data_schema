@@ -4,7 +4,7 @@ Purpose: Create the engine object in a file db.py
 
 from sqlmodel import SQLModel, create_engine
 
-from models import (
+from db_models import (
     Author,  # noqa: F401
     Barostat,  # noqa: F401
     Database,  # noqa: F401
