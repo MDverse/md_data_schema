@@ -50,7 +50,7 @@ logger.remove()
 # Terminal format
 logger.add(
     sys.stderr,
-    format="{time:MMMM D, YYYY - HH:mm:ss} | <lvl>{level:<8} --- {message}</lvl>",
+    format="{time:MMMM D, YYYY - HH:mm:ss} | <lvl>{level:<8} | {message}</lvl>",
     level="DEBUG",
 )
 # Log file format
@@ -107,14 +107,27 @@ def update_dataset_fields(existing: Dataset, row: pd.Series, fields: list[str]) 
     return changed
 
 
-def delete_files(engine: Engine, new_or_modified_datasets: list[int]) -> None:
+def delete_files_for_update(engine: Engine, new_or_modified_datasets: list[int]) -> None:
     "Delete all files associated to the datasets that have been updated"
     with Session(engine) as session:
-        stmt = delete(File).where(File.dataset_id.in_(new_or_modified_datasets))
-        result = session.exec(stmt)
-        session.commit()
-    logger.info(f"Total files deleted from updated datasets: {result.rowcount}")
+        files_stmt = delete(File).where(File.dataset_id.in_(new_or_modified_datasets))
+        result_files = session.exec(files_stmt)
 
+        trajectory_stmt = delete(TrajectoryFile).where(TrajectoryFile.dataset_id.in_(new_or_modified_datasets))
+        result_trajectory= session.exec(trajectory_stmt)
+
+        parameter_stmt = delete(ParameterFile).where(ParameterFile.dataset_id.in_(new_or_modified_datasets))
+        result_parameter =session.exec(parameter_stmt)
+
+        topology_stmt = delete(TopologyFile).where(TopologyFile.dataset_id.in_(new_or_modified_datasets))
+        result_topology =session.exec(topology_stmt)
+
+        session.commit()
+
+    logger.info(f"Total rows from FILES deleted from updated datasets: {result_files.rowcount}")
+    logger.info(f"Total rows from TRAJECTORY_FILES deleted from updated datasets: {result_trajectory.rowcount}")
+    logger.info(f"Total rows from PARAMETER_FILES deleted from updated datasets: {result_parameter.rowcount}")
+    logger.info(f"Total rows from TOPOLOGY_FILES deleted from updated datasets: {result_topology.rowcount}")
 
 # ============================================================================
 # Data loading functions
@@ -184,73 +197,77 @@ def load_files_data(parquet_path: str) -> pd.DataFrame:
     })
     return files_df
 
-# def load_topology_data(parquet_path_topology: str) -> pd.DataFrame:
-#     """Load parquet file and return DataFrame with selected columns.
+def load_topology_data(parquet_path_topology: str) -> pd.DataFrame:
+    """Load parquet file and return DataFrame with selected columns.
 
-#     Rename columns to match the SQLModel table columns.
-#     """
-#     topology_df = pd.read_parquet(parquet_path_topology)
+    Rename columns to match the SQLModel table columns.
+    """
+    topology_df = pd.read_parquet(parquet_path_topology)
 
-#     topology_df = topology_df[[
-#         'dataset_origin',
-#         'dataset_id',
-#         'file_name',
-#         'atom_number',
-#         'has_protein',
-#         'has_nucleic',
-#         'has_lipid',
-#         'has_glucid',
-#         "has_water_ion"
-#         ]].rename(columns={
-#             'dataset_id': 'dataset_id_in_origin',
-#             'file_name': 'name'
-#             })
+    topology_df = topology_df[[
+        'dataset_origin',
+        'dataset_id',
+        'file_name',
+        'atom_number',
+        'has_protein',
+        'has_nucleic',
+        'has_lipid',
+        'has_glucid',
+        "has_water_ion"
+        ]].rename(columns={
+            'dataset_id': 'dataset_id_in_origin',
+            'file_name': 'name'
+            })
 
-#     return topology_df
+    return topology_df
 
-# def load_parameter_data(parquet_path_parameters: str) -> pd.DataFrame:
-#     """Load parquet file and return DataFrame with selected columns.
+def load_parameter_data(parquet_path_parameters: str) -> pd.DataFrame:
+    """Load parquet file and return DataFrame with selected columns.
 
-#     Rename columns to match the SQLModel table columns.
-#     """
-#     parameter_df = pd.read_parquet(parquet_path_parameters)
+    Rename columns to match the SQLModel table columns.
+    """
+    parameter_df = pd.read_parquet(parquet_path_parameters)
 
-#     parameter_df = parameter_df[[
-#         'dataset_origin',
-#         'dataset_id',
-#         'file_name',
-#         'dt',
-#         'nsteps',
-#         'temperature',
-#         'thermostat',
-#         'barostat',
-#         'integrator'
-#         ]].rename(columns={
-#             'dataset_id': 'dataset_id_in_origin',
-#             'file_name': 'name'
-#             })
+    parameter_df = parameter_df[[
+        'dataset_origin',
+        'dataset_id',
+        'file_name',
+        'dt',
+        'nsteps',
+        'temperature',
+        'thermostat',
+        'barostat',
+        'integrator'
+        ]].rename(columns={
+            'dataset_id': 'dataset_id_in_origin',
+            'file_name': 'name'
+            })
+    
+    # If integrator is missing, set it no 'unknown
+    parameter_df['integrator'] = parameter_df['integrator'].apply(lambda x: x if pd.notna(x) else "undefined")
 
-#     return parameter_df
+    return parameter_df
 
-# def load_trajectory_data(parquet_path_trajectory: str) -> pd.DataFrame:
-#     """Load parquet file and return DataFrame with selected columns.
+def load_trajectory_data(parquet_path_trajectory: str) -> pd.DataFrame:
+    """Load parquet file and return DataFrame with selected columns.
 
-#     Rename columns to match the SQLModel table columns.
-#     """
-#     trajectory_df = pd.read_parquet(parquet_path_trajectory)
+    Rename columns to match the SQLModel table columns.
+    """
+    trajectory_df = pd.read_parquet(parquet_path_trajectory)
 
-#     trajectory_df = trajectory_df[[
-#     'dataset_origin',
-#     'dataset_id',
-#     'file_name',
-#     'atom_number',
-#     'frame_number'
-#     ]].rename(columns={
-#         'dataset_id': 'dataset_id_in_origin',
-#         'file_name': 'name'
-#         })
+    trajectory_df = trajectory_df[[
+    'dataset_origin',
+    'dataset_id',
+    'file_name',
+    'atom_number',
+    'frame_number'
+    ]].rename(columns={
+        'dataset_id': 'dataset_id_in_origin',
+        'file_name': 'name'
+        })
 
-#     return trajectory_df
+    return trajectory_df
+
 
 
 # ============================================================================
@@ -588,190 +605,266 @@ def create_files_tables(
 # Thermostat, Barostat, Integrator
 # ============================================================================
 
-# def create_topology_table(topology_df: pd.DataFrame, engine: Engine) -> None:
-#     """Create the TopologyFile records in the database."""
+def create_topology_table(
+        topology_df: pd.DataFrame,
+        engine: Engine,
+        datasets_ids_new_or_modified: list[int],
+        ) -> None:
+    """Create the TopologyFile records in the database."""
 
-#     with Session(engine) as session:
-#         for _, row in topology_df.iterrows():
+    with Session(engine) as session:
+        for _, row in tqdm(
+            topology_df.iterrows(),
+            total=len(topology_df),
+            desc="Processing topology rows",
+            unit="row",
+            ):
 
-#             dataset_id_in_origin = row["dataset_id_in_origin"]
-#             dataset_origin = row["dataset_origin"]
-#             statement_dataset = select(Dataset).join(DatasetOrigin).where(
-#                 Dataset.id_in_origin == dataset_id_in_origin,
-#                 DatasetOrigin.name == dataset_origin
-#                 )
-#             dataset_obj = session.exec(statement_dataset).first()
-#             if not dataset_obj:
-#                 print(
-#                     f"Dataset with id_in_origin {dataset_id_in_origin}"
-#                     f" and origin {dataset_origin} not found."
-#                     )
-#                 continue  # Skip if not found
-#             dataset_id = dataset_obj.dataset_id
+            dataset_id_in_origin = row["dataset_id_in_origin"]
+            dataset_origin = row["dataset_origin"]
+            statement_dataset = select(Dataset).join(DatasetOrigin).where(
+                Dataset.id_in_origin == dataset_id_in_origin,
+                DatasetOrigin.name == dataset_origin
+                )
+            dataset_obj = session.exec(statement_dataset).first()
+            if not dataset_obj:
+                print(
+                    f"Dataset with id_in_origin {dataset_id_in_origin}"
+                    f" and origin {dataset_origin} not found."
+                    )
+                continue  # Skip if not found
+            dataset_id = dataset_obj.dataset_id
 
-#             gro_file_name = row["name"]
-#             statement_file = select(File).join(FileType).where(
-#                 # Here we filter out the .gro files to go faster but when
-#                 # we'll have more than just .gro files in the topology table,
-#                 # we'll remove this or refine
-#                 FileType.name == "gro",
-#                 File.name == gro_file_name,
-#                 File.dataset_id == dataset_id
-#             )
-#             file_obj = session.exec(statement_file).first()
-#             if not file_obj:
-#                 print(
-#                     f"File with dataset_id {dataset_obj.dataset_id}"
-#                     f" and file name {gro_file_name} not found."
-#                     )
-#                 continue  # Skip if not found
-#             file_id_in_files = file_obj.file_id
-
-
-#             # -- Create the TopologyFile --
-#             topology_obj = TopologyFile(
-#                 file_id=file_id_in_files,
-#                 atom_number=row["atom_number"],
-#                 has_protein=row["has_protein"],
-#                 has_nucleic=row["has_nucleic"],
-#                 has_lipid=row["has_lipid"],
-#                 has_glucid=row["has_glucid"],
-#                 has_water_ion=row["has_water_ion"]
-#             )
-
-#             session.add(topology_obj)
-#             session.commit()
-
-# def create_parameters_table(param_df: pd.DataFrame, engine: Engine) -> None:
-#     """
-#     Create the ParameterFile records in the database.
-#     At the same time, create the Thermostat, Barostat, and Integrator records.
-#     """
-
-#     with Session(engine) as session:
-#         for _, row in param_df.iterrows():
-
-#             dataset_id_in_origin = row["dataset_id_in_origin"]
-#             dataset_origin = row["dataset_origin"]
-#             statement = select(Dataset).join(DatasetOrigin).where(
-#                 Dataset.id_in_origin == dataset_id_in_origin,
-#                 DatasetOrigin.name == dataset_origin
-#                 )
-#             dataset_obj = session.exec(statement).first()
-#             if not dataset_obj:
-#                 print(
-#                     f"Dataset with id_in_origin {dataset_id_in_origin}"
-#                     f" and origin {dataset_origin} not found."
-#                     )
-#                 continue  # Skip if not found
-#             dataset_id = dataset_obj.dataset_id
-
-#             mdp_file_name = row["name"]
-#             statement_file = select(File).join(FileType).where(
-#                 # Here we filter out the .mdp files to go faster but when
-#                 # we'll have more than just .mdp files in the parameters table,
-#                 # we'll remove this or refine
-#                 FileType.name == "mdp",
-#                 File.name == mdp_file_name,
-#                 File.dataset_id == dataset_id
-#             )
-#             file_obj = session.exec(statement_file).first()
-#             if not file_obj:
-#                 print(
-#                     f"File with dataset_id {dataset_obj.dataset_id}"
-#                     f" and file name {mdp_file_name} not found."
-#                     )
-#                 continue  # Skip if not found
-#             file_id_in_files = file_obj.file_id
+            # Determine if file exists already based on dataset status.
+            existing_file = True
+            # If the dataset is new or has been modified,
+            # then all files are new to the database
+            if dataset_id in datasets_ids_new_or_modified:
+                existing_file = False
+            
+            if not existing_file:
+                gro_file_name = row["name"]
+                statement_file = select(File).join(FileType).where(
+                    # Here we filter out the .gro files to go faster but when
+                    # we'll have more than just .gro files in the topology table,
+                    # we'll remove this or refine
+                    FileType.name == "gro",
+                    File.name == gro_file_name,
+                    File.dataset_id == dataset_id
+                )
+                files = session.exec(statement_file).all()
+                if len(files) > 1:
+                    print(
+                        f"Multiple files found with dataset_id {dataset_obj.dataset_id}"
+                        f" and file name {gro_file_name}. Skipping..."
+                        )
+                    print(files)
+                    continue
+                file_obj = session.exec(statement_file).first()
+                if not file_obj:
+                    print(
+                        f"File with dataset_id {dataset_obj.dataset_id}"
+                        f" and file name {gro_file_name} not found."
+                        )
+                    continue  # Skip if not found
+                file_id_in_files = file_obj.file_id
 
 
-#             # -- Handle Thermostat, Barostat, Integrator --
-#             # Thermostat
-#             thermostat = row.get("thermostat", None)
-#             thermostat_obj = get_or_create_models_with_one_attribute(
-#                 session, Thermostat, "name", thermostat)
+                # -- Create the TopologyFile --
+                topology_obj = TopologyFile(
+                    file_id=file_id_in_files,
+                    atom_number=row["atom_number"],
+                    has_protein=row["has_protein"],
+                    has_nucleic=row["has_nucleic"],
+                    has_lipid=row["has_lipid"],
+                    has_glucid=row["has_glucid"],
+                    has_water_ion=row["has_water_ion"]
+                )
 
-#             # Barostat
-#             barostat = row.get("barostat", None)
-#             barostat_obj = get_or_create_models_with_one_attribute(
-#                 session, Barostat, "name", barostat)
+                session.add(topology_obj)
+                session.commit()
 
-#             # Integrator
-#             integrator = row.get("integrator", None)
-#             integrator_obj = get_or_create_models_with_one_attribute(
-#                 session, Integrator, "name", integrator)
+def create_parameters_table(
+        param_df: pd.DataFrame,
+        engine: Engine,
+        datasets_ids_new_or_modified: list[int],
+        ) -> None:
+    """
+    Create the ParameterFile records in the database.
+    At the same time, create the Thermostat, Barostat, and Integrator records.
+    """
+
+    with Session(engine) as session:
+        for _, row in tqdm(
+            param_df.iterrows(),
+            total=len(param_df),
+            desc="Processing parameter rows",
+            unit="row",
+        ):
+
+            dataset_id_in_origin = row["dataset_id_in_origin"]
+            dataset_origin = row["dataset_origin"]
+            statement = select(Dataset).join(DatasetOrigin).where(
+                Dataset.id_in_origin == dataset_id_in_origin,
+                DatasetOrigin.name == dataset_origin
+                )
+            dataset_obj = session.exec(statement).first()
+            if not dataset_obj:
+                print(
+                    f"Dataset with id_in_origin {dataset_id_in_origin}"
+                    f" and origin {dataset_origin} not found."
+                    )
+                continue  # Skip if not found
+            dataset_id = dataset_obj.dataset_id
+
+            # Determine if file exists already based on dataset status.
+            existing_file = True
+            # If the dataset is new or has been modified,
+            # then all files are new to the database
+            if dataset_id in datasets_ids_new_or_modified:
+                existing_file = False
+            
+            if not existing_file:
+
+                mdp_file_name = row["name"]
+                statement_file = select(File).join(FileType).where(
+                    # Here we filter out the .mdp files to go faster but when
+                    # we'll have more than just .mdp files in the parameters table,
+                    # we'll remove this or refine
+                    FileType.name == "mdp",
+                    File.name == mdp_file_name,
+                    File.dataset_id == dataset_id
+                )
+                files = session.exec(statement_file).all()
+                if len(files) > 1:
+                    print(
+                        f"Multiple files found with dataset_id {dataset_obj.dataset_id}"
+                        f" and file name {mdp_file_name}. Skipping..."
+                        )
+                    print(files)
+                    continue
+                file_obj = session.exec(statement_file).first()
+                if not file_obj:
+                    print(
+                        f"File with dataset_id {dataset_obj.dataset_id}"
+                        f" and file name {mdp_file_name} not found."
+                        )
+                    continue  # Skip if not found
+                file_id_in_files = file_obj.file_id
 
 
-#             # -- Create the ParameterFile --
-#             parameter_obj = ParameterFile(
-#                 file_id=file_id_in_files,
-#                 dt=row["dt"],
-#                 nsteps=row["nsteps"],
-#                 temperature=row["temperature"],
-#                 thermostat_id=thermostat_obj.thermostat_id,
-#                 barostat_id=barostat_obj.barostat_id,
-#                 integrator_id=integrator_obj.integrator_id
-#             )
+                # -- Handle Thermostat, Barostat, Integrator --
+                # Thermostat
+                thermostat = row.get("thermostat", None)
+                thermostat_obj = get_or_create_models_with_one_attribute(
+                    session, Thermostat, "name", thermostat)
 
-#             session.add(parameter_obj)
-#             session.commit()
+                # Barostat
+                barostat = row.get("barostat", None)
+                barostat_obj = get_or_create_models_with_one_attribute(
+                    session, Barostat, "name", barostat)
 
-# def create_trajectory_table(traj_df: pd.DataFrame, engine: Engine) -> None:
-#     """Create the TrajectoryFile records in the database."""
-
-#     with Session(engine) as session:
-#         missing_files = 0
-#         for index, row in traj_df.iterrows():
-#             xtc_file_name = row["name"]
-
-#             dataset_id_in_origin = row["dataset_id_in_origin"]
-#             dataset_origin = row["dataset_origin"]
-#             statement = select(Dataset).join(DatasetOrigin).where(
-#                 Dataset.id_in_origin == dataset_id_in_origin,
-#                 DatasetOrigin.name == dataset_origin
-#                 )
-#             dataset_obj = session.exec(statement).first()
-#             if not dataset_obj:
-#                 logger.debug(
-#                     f"Dataset with id_in_origin {dataset_id_in_origin}"
-#                     f" and origin {dataset_origin} not found.\n",
-#                     f"Skipping {xtc_file_name} (index: {index})..."
-#                     )
-#                 missing_files += 1
-#                 continue  # Skip if not found
-#             dataset_id = dataset_obj.dataset_id
-
-#             statement_file = select(File).join(FileType).where(
-#                 # Here we filter out the .xtc files to go faster but when
-#                 # we'll have more than just .xtc files in the trajectory table,
-#                 # we'll remove this or refine
-#                 FileType.name == "xtc",
-#                 File.name == xtc_file_name,
-#                 File.dataset_id == dataset_id
-#             )
-#             file_obj = session.exec(statement_file).first()
-#             if not file_obj:
-#                 logger.debug(
-#                     f"File with dataset_id {dataset_obj.dataset_id}"
-#                     f" and file name {xtc_file_name} not found.\n",
-#                     f"Skipping {xtc_file_name} (index: {index})..."
-#                     )
-#                 missing_files += 1
-#                 continue  # Skip if not found
-#             file_id_in_files = file_obj.file_id
+                # Integrator
+                integrator = row.get("integrator", None)
+                integrator_obj = get_or_create_models_with_one_attribute(
+                    session, Integrator, "name", integrator)
 
 
-#             # -- Create the TrajectoryFile --
-#             traj_obj = TrajectoryFile(
-#                 file_id=file_id_in_files,
-#                 atom_number=row["atom_number"],
-#                 frame_number=row["frame_number"]
-#             )
+                # -- Create the ParameterFile --
+                parameter_obj = ParameterFile(
+                    file_id=file_id_in_files,
+                    dt=row["dt"],
+                    nsteps=row["nsteps"],
+                    temperature=row["temperature"],
+                    thermostat_id=thermostat_obj.thermostat_id,
+                    barostat_id=barostat_obj.barostat_id,
+                    integrator_id=integrator_obj.integrator_id
+                )
 
-#             session.add(traj_obj)
-#             session.commit()
-#     logger.info("Completed creating trajectory table.")
-#     logger.debug(f"Number of missing files: {missing_files}")
+                session.add(parameter_obj)
+                session.commit()
+
+def create_trajectory_table(
+        traj_df: pd.DataFrame,
+        engine: Engine,
+        datasets_ids_new_or_modified: list[int],
+        ) -> None:
+    """Create the TrajectoryFile records in the database."""
+
+    with Session(engine) as session:
+        missing_files = 0
+        for index, row in tqdm(
+            traj_df.iterrows(),
+            total=len(traj_df),
+            desc="Processing trajectory rows",
+            unit="row",
+            ):
+            xtc_file_name = row["name"]
+
+            dataset_id_in_origin = row["dataset_id_in_origin"]
+            dataset_origin = row["dataset_origin"]
+            statement = select(Dataset).join(DatasetOrigin).where(
+                Dataset.id_in_origin == dataset_id_in_origin,
+                DatasetOrigin.name == dataset_origin
+                )
+            dataset_obj = session.exec(statement).first()
+            if not dataset_obj:
+                logger.debug(
+                    f"Dataset with id_in_origin {dataset_id_in_origin}"
+                    f" and origin {dataset_origin} not found.\n",
+                    f"Skipping {xtc_file_name} (index: {index})..."
+                    )
+                missing_files += 1
+                continue  # Skip if not found
+            dataset_id = dataset_obj.dataset_id
+            # Determine if file exists already based on dataset status.
+            existing_file = True
+            # If the dataset is new or has been modified,
+            # then all files are new to the database
+            if dataset_id in datasets_ids_new_or_modified:
+                existing_file = False
+            
+            if not existing_file:
+
+                statement_file = select(File).join(FileType).where(
+                    # Here we filter out the .xtc files to go faster but when
+                    # we'll have more than just .xtc files in the trajectory table,
+                    # we'll remove this or refine
+                    FileType.name == "xtc",
+                    File.name == xtc_file_name,
+                    File.dataset_id == dataset_id
+                )
+                files = session.exec(statement_file).all()
+                if len(files) > 1:
+                    print(
+                        f"Multiple files found with dataset_id {dataset_obj.dataset_id}"
+                        f" and file name {xtc_file_name}. Skipping..."
+                        )
+                    print(files)
+                    continue
+                file_obj = session.exec(statement_file).first()
+                if not file_obj:
+                    logger.debug(
+                        f"File with dataset_id {dataset_obj.dataset_id}"
+                        f" and file name {xtc_file_name} not found.\n",
+                        f"Skipping {xtc_file_name} (index: {index})..."
+                        )
+                    missing_files += 1
+                    continue  # Skip if not found
+                file_id_in_files = file_obj.file_id
+
+
+                # -- Create the TrajectoryFile --
+                traj_obj = TrajectoryFile(
+                    file_id=file_id_in_files,
+                    atom_number=row["atom_number"],
+                    frame_number=row["frame_number"]
+                )
+
+                session.add(traj_obj)
+                session.commit()
+
+    logger.debug(f"Number of missing files: {missing_files}")
 
 # ============================================================================
 
@@ -798,45 +891,50 @@ def data_ingestion():
     elapsed_time_1 = str(timedelta(seconds=execution_time_1)).split('.')[0]
     logger.info(f"Datasets ingestion time: {elapsed_time_1}\n")
 
-    start_2 = time.perf_counter()
-
-
-    # Load the files data
-    files_df = load_files_data(files_path)
 
     if len(new_or_modified_datasets) > 0:
-        logger.info("New or modified datasets found.")
-        logger.info("Deleting files associated to modified datasets...")
-        delete_files(engine, new_or_modified_datasets)
 
-        logger.info("\nCreating files tables...")
+        start_2 = time.perf_counter()
+
+        # Load the files data
+        files_df = load_files_data(files_path)
+        logger.info("New or modified datasets found.")
+        logger.info("Deleting files associated to modified datasets...\n")
+        delete_files_for_update(engine, new_or_modified_datasets)
+
+        logger.info("Creating files tables...")
         logger.info("File, FileType, Software tables")
         create_files_tables(files_df, engine, new_or_modified_datasets)
+
+        execution_time_2 = time.perf_counter() - start_2
+        elapsed_time__2 = str(timedelta(seconds=execution_time_2)).split('.')[0]
+        logger.info(f"Files ingestion time: {elapsed_time__2}\n")
+
+        start_3 = time.perf_counter()
+
+        # Create the topology, parameters, and trajectory tables
+        topology_df = load_topology_data(gro_path)
+        parameter_df = load_parameter_data(mdp_path)
+        trajectory_df = load_trajectory_data(xtc_path)
+
+        logger.info("Creating simulation tables...\n")
+        logger.info("Creating TopologyFile table...")
+        create_trajectory_table(trajectory_df, engine)
+        logger.success("Completed creating trajectory table.\n")
+        logger.info("Creating ParameterFile, Thermostat, Barostat, Integrator tables...")
+        create_parameters_table(parameter_df, engine)
+        logger.success("Completed creating parameters tables.\n")
+        logger.info("Creating TopologyFile table...")
+        create_topology_table(topology_df, engine)
+        logger.success("Completed creating topology table.\n")
+
+        execution_time_3 = time.perf_counter() - start_3
+        elapsed_time_3 = str(timedelta(seconds=execution_time_3)).split('.')[0]
+        logger.info(f"Simulation files ingestion time: {elapsed_time_3}\n")
     else:
-        logger.info("No new or modified datasets found. Skipping files ingestion.")
+        logger.info("No new or modified datasets found. Skipping files ingestion...\n")
 
-    execution_time_2 = time.perf_counter() - start_2
-    elapsed_time__2 = str(timedelta(seconds=execution_time_2)).split('.')[0]
-    print(f"Files ingestion time: {elapsed_time__2}\n")
-
-
-    # delete_simulation_tables()
-
-    # start_3 = time.perf_counter()
-
-    # # Create the topology, parameters, and trajectory tables
-    # topology_df = load_topology_data(gro_path)
-    # parameter_df = load_parameter_data(mdp_path)
-    # trajectory_df = load_trajectory_data(xtc_path)
-
-    # create_trajectory_table(trajectory_df, engine)
-    # create_parameters_table(parameter_df, engine)
-    # create_topology_table(topology_df, engine)
-
-    # execution_time_3 = time.perf_counter() - start_3
-    # elapsed_time_3 = str(timedelta(seconds=execution_time_3)).split('.')[0]
-    # print(f"Simulation files ingestion time: {execution_time_3:.2f} seconds\n")
-
+    
     # Measure the total execution time
     execution_time_4 = time.perf_counter() - start_4
     elapsed_time_4 = str(timedelta(seconds=execution_time_4)).split('.')[0]
