@@ -9,9 +9,9 @@ from sqlmodel import Session, select, delete, SQLModel
 from tqdm import tqdm
 
 from datetime import datetime
-from db_engine import engine
 from datetime import timedelta
-from db_models import (
+from db_schema import (
+    engine,
     Author,
     Barostat,
     Dataset,

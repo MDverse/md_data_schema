@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
+from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint, create_engine
 
 # ============================================================================
 
@@ -454,3 +454,16 @@ class Integrator(SQLModel, table=True):
 
     # Relationships: parameter_files
     parameter_file: list[ParameterFile] = Relationship(back_populates="integrator")
+
+
+# ============================================================================
+# Engine
+# ============================================================================
+
+sqlite_file_name = "database.db"
+sqlite_url = f"sqlite:///{sqlite_file_name}"
+
+engine = create_engine(sqlite_url)
+
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)

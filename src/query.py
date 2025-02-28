@@ -6,8 +6,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
-from db_engine import engine
-from db_models import Dataset, DatasetOrigin, File, FileType
+from db_schema import engine
+from db_schema import Dataset, DatasetOrigin, File, FileType
 
 """Purpose
 This script demonstrates how to query the database to extract and print
