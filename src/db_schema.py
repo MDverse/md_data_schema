@@ -99,7 +99,7 @@ class DatasetMoleculeLink(SQLModel, table=True):
 class MoleculeTopologyLink(SQLModel, table=True):
     """
     MtM link table between Molecule and TopologyFile
-    LOGIC: A molecule is definitely in one or more topology files and
+    LOGIC: A molecule is definitely in one or more topology files and,
     a topology file necessarily has one or more molecules.
     """
 
@@ -126,6 +126,22 @@ class DatasetKeywordLink(SQLModel, table=True):
     )
     keyword_id: Optional[int] = Field(
         default=None, foreign_key="keywords.keyword_id", primary_key=True
+    )
+
+class DatasetSoftwareLink(SQLModel, table=True):
+    """
+    MtM link table between Dataset and Software
+    LOGIC: A dataset can have 0 or many software and,
+    a software it is definitely in a dataset or many datasets.
+    """
+
+    __tablename__ = "datasets_softwares_link"
+
+    dataset_id: Optional[int] = Field(
+        default=None, foreign_key="datasets.dataset_id", primary_key=True
+    )
+    software_id: Optional[int] = Field(
+        default=None, foreign_key="software.software_id", primary_key=True
     )
 
 
@@ -161,9 +177,9 @@ class Dataset(SQLModel, table=True):
     title: str
     description: Optional[str] = None
 
-    # Relationships: files, origins, authors, molecules ----------------------
+    # Relationships: files, origins, authors, molecules, keywords, software --
 
-    # A dataset can have many files, authors, and molecules
+    # A dataset can have many files, authors, keywords, software and molecules
     # (although it can have zero molecules)
     # A dataset can have only one origin (not a list)
     file: list["File"] = Relationship(back_populates="dataset")
@@ -176,6 +192,9 @@ class Dataset(SQLModel, table=True):
     )
     keyword: Optional[list["Keyword"]] = Relationship(
         back_populates="dataset", link_model=DatasetKeywordLink
+    )
+    software: Optional[list["Software"]] = Relationship(
+        back_populates="dataset", link_model=DatasetSoftwareLink
     )
 
 
@@ -192,7 +211,6 @@ class File(SQLModel, table=True):
     md5: Optional[str] = Field(default=None)
     # files that belong to a zip file don't have url
     url: Optional[str] = Field(default=None)
-    software_id: Optional[int] = Field(foreign_key="software.software_id")
     is_from_zip_file: bool = Field(index=True)
     parent_zip_file_id: Optional[int] = Field(
         # notice the lowercase "f" to refer to the database table name
@@ -202,7 +220,7 @@ class File(SQLModel, table=True):
     )
 
     # Relationships: datasets, files, topology_files, parameter_files, -------
-    # trajectory_files, software, file_types
+    # trajectory_files, file_types
 
     parent: Optional["File"] = Relationship(
         back_populates="children",
@@ -214,7 +232,6 @@ class File(SQLModel, table=True):
     topology_file: Optional["TopologyFile"] = Relationship(back_populates="file")
     parameter_file: Optional["ParameterFile"] = Relationship(back_populates="file")
     trajectory_file: Optional["TrajectoryFile"] = Relationship(back_populates="file")
-    softwares: Optional["Software"] = Relationship(back_populates="file")
     file_type: "FileType" = Relationship(back_populates="file")
 
 
@@ -423,7 +440,9 @@ class Software(SQLModel, table=True):
     version: Optional[str] = Field(default=None)
 
     # Relationships: files
-    file: list[File] = Relationship(back_populates="softwares")
+    dataset: list[Dataset] = Relationship(
+        back_populates="software", link_model=DatasetSoftwareLink
+    )
 
 
 class Thermostat(SQLModel, table=True):

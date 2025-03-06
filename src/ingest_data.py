@@ -561,17 +561,12 @@ def create_files_tables(
                                 f"'{row['name']}' with dataset_id {current_dataset.dataset_id}."
                                 )
 
-                # --- Handle Software (which we have no data for currently 11/02/2025) ---
-                # We can simply leave it as None (or set to a default value if needed)
-                software_id = None
-
                 new_file_obj = File(
                     name=row["name"],
                     size_in_bytes=row["size_in_bytes"],
                     md5=row["md5"],
                     url=row["url"],
                     is_from_zip_file=row["is_from_zip_file"],
-                    software_id=software_id,
                     # use the integer id from the Dataset record
                     dataset_id=current_dataset.dataset_id,
                     # use the file type id from FileType record
