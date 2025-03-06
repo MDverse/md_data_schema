@@ -7,10 +7,11 @@
         datasets ||--o{ datasets_molecules_link : ""
         datasets }|--|| dataset_origins : ""
         datasets ||--o{ datasets_keywords_link : ""
+        datasets ||--o{ datasets_software_link : ""
         keywords ||--|{ datasets_keywords_link : ""
+        software ||--|{ datasets_software_link : ""
         files }|--o| files : ""
         files }|--|| file_types : ""
-        files }|--o| software : ""
         files ||--o| topology_files : ""
         files ||--o| parameter_files : ""
         files ||--o| trajectory_files : ""
@@ -74,7 +75,6 @@
             str url "Direct URL to access the file ('None' if inside a zip archive)"
             bool is_from_zip_file "True if file is extracted from a zip archive"
             int parent_zip_file_id FK "File ID of the parent zip file, if applicable"
-            int software_id FK "Foreign key referencing the software used to generate the file"
         }
         topology_files {
             int file_id PK, FK "Primary key and foreign key referencing files"
