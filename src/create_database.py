@@ -1,6 +1,6 @@
 import time
 
-from db_engine import create_db_and_tables
+from db_schema import create_db_and_tables
 
 """Purpose:
 This script takes care of creating the database and tables.
