@@ -164,12 +164,40 @@ def random_mdp_information():
             print(f"{key}: {value_str}")
         print("-" * 40, "\n")
 
+def print_datasets_no_files():
+
+    with Session(engine) as session:
+        # Build a query that from joining Dataset and File tables:
+        # - Selects all datasets that have no files.
+        # - Groups by Dataset.
+        # - Filters for datasets with no files.
+        statement = (
+            select(Dataset)
+            .outerjoin(File, Dataset.dataset_id == File.dataset_id)
+            .group_by(Dataset)
+            .having(func.count(File.file_id) == 0)
+        )
+        results = session.exec(statement).all()
+
+        # Print the number of datasets with no files.
+        print(f"Number of datasets with no files: {len(results)}\n")
+
+        # If there are datasets with no files, print the first 5 dataset IDs.
+        if results:
+            # Print all the datasets with no files.
+            print("Dataset IDs with no files:")
+            for dataset in results:
+                print(f"Dataset ID in database: {dataset.dataset_id}\n Datset ID in origin: {dataset.id_in_origin} \n Origin: {dataset.origin_id}\n")
+            print("\n")
+
 def main():
     print_dataset_origin_summary()
     print("\n\n")
     query_to_dataframe()
     print("\n\n")
     random_mdp_information()
+    print("\n\n")
+    print_datasets_no_files()
     print("\n\n")
 
 if __name__ == "__main__":
