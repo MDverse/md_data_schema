@@ -11,7 +11,7 @@ dependencies = [
     "pandas>=2.2.3",
     "pyarrow>=19.0.0",
     "requests>=2.32.3",
-    "sqlmodel>=0.0.22",
+    "sqlmodel>=0.0.24",
     "tqdm>=4.67.1",
 ]
 
