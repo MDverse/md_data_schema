@@ -306,7 +306,6 @@ def create_or_update_datasets_authors_origins_tables(
     datasets_ids_unchanged = []
     datasets_ids_modified = []
 
-
     # The session is used to interact with the database—querying, adding,
     # and committing changes.
     with Session(engine) as session:
