@@ -113,21 +113,21 @@ def delete_files_for_update(engine: Engine, new_or_modified_datasets: list[int])
         files_stmt = delete(File).where(File.dataset_id.in_(new_or_modified_datasets))
         result_files = session.exec(files_stmt)
 
-        trajectory_stmt = delete(TrajectoryFile).where(TrajectoryFile.dataset_id.in_(new_or_modified_datasets))
-        result_trajectory= session.exec(trajectory_stmt)
+        # trajectory_stmt = delete(TrajectoryFile).where(TrajectoryFile.dataset_id.in_(new_or_modified_datasets))
+        # result_trajectory= session.exec(trajectory_stmt)
 
-        parameter_stmt = delete(ParameterFile).where(ParameterFile.dataset_id.in_(new_or_modified_datasets))
-        result_parameter =session.exec(parameter_stmt)
+        # parameter_stmt = delete(ParameterFile).where(ParameterFile.dataset_id.in_(new_or_modified_datasets))
+        # result_parameter =session.exec(parameter_stmt)
 
-        topology_stmt = delete(TopologyFile).where(TopologyFile.dataset_id.in_(new_or_modified_datasets))
-        result_topology =session.exec(topology_stmt)
+        # topology_stmt = delete(TopologyFile).where(TopologyFile.dataset_id.in_(new_or_modified_datasets))
+        # result_topology =session.exec(topology_stmt)
 
         session.commit()
 
     logger.info(f"Total rows from FILES deleted from updated datasets: {result_files.rowcount}")
-    logger.info(f"Total rows from TRAJECTORY_FILES deleted from updated datasets: {result_trajectory.rowcount}")
-    logger.info(f"Total rows from PARAMETER_FILES deleted from updated datasets: {result_parameter.rowcount}")
-    logger.info(f"Total rows from TOPOLOGY_FILES deleted from updated datasets: {result_topology.rowcount}")
+    # logger.info(f"Total rows from TRAJECTORY_FILES deleted from updated datasets: {result_trajectory.rowcount}")
+    # logger.info(f"Total rows from PARAMETER_FILES deleted from updated datasets: {result_parameter.rowcount}")
+    # logger.info(f"Total rows from TOPOLOGY_FILES deleted from updated datasets: {result_topology.rowcount}")
 
 # ============================================================================
 # Data loading functions
@@ -306,7 +306,6 @@ def create_or_update_datasets_authors_origins_tables(
     datasets_ids_unchanged = []
     datasets_ids_modified = []
 
-    total_files_deleted = 0
 
     # The session is used to interact with the database—querying, adding,
     # and committing changes.
@@ -905,27 +904,27 @@ def data_ingestion():
         elapsed_time__2 = str(timedelta(seconds=execution_time_2)).split('.')[0]
         logger.info(f"Files ingestion time: {elapsed_time__2}\n")
 
-        start_3 = time.perf_counter()
+        # start_3 = time.perf_counter()
 
-        # Create the topology, parameters, and trajectory tables
-        topology_df = load_topology_data(gro_path)
-        parameter_df = load_parameter_data(mdp_path)
-        trajectory_df = load_trajectory_data(xtc_path)
+        # # Create the topology, parameters, and trajectory tables
+        # topology_df = load_topology_data(gro_path)
+        # parameter_df = load_parameter_data(mdp_path)
+        # trajectory_df = load_trajectory_data(xtc_path)
 
-        logger.info("Creating simulation tables...\n")
-        logger.info("Creating TopologyFile table...")
-        create_trajectory_table(trajectory_df, engine)
-        logger.success("Completed creating trajectory table.\n")
-        logger.info("Creating ParameterFile, Thermostat, Barostat, Integrator tables...")
-        create_parameters_table(parameter_df, engine)
-        logger.success("Completed creating parameters tables.\n")
-        logger.info("Creating TopologyFile table...")
-        create_topology_table(topology_df, engine)
-        logger.success("Completed creating topology table.\n")
+        # logger.info("Creating simulation tables...\n")
+        # logger.info("Creating TopologyFile table...")
+        # create_trajectory_table(trajectory_df, engine)
+        # logger.success("Completed creating trajectory table.\n")
+        # logger.info("Creating ParameterFile, Thermostat, Barostat, Integrator tables...")
+        # create_parameters_table(parameter_df, engine)
+        # logger.success("Completed creating parameters tables.\n")
+        # logger.info("Creating TopologyFile table...")
+        # create_topology_table(topology_df, engine)
+        # logger.success("Completed creating topology table.\n")
 
-        execution_time_3 = time.perf_counter() - start_3
-        elapsed_time_3 = str(timedelta(seconds=execution_time_3)).split('.')[0]
-        logger.info(f"Simulation files ingestion time: {elapsed_time_3}\n")
+        # execution_time_3 = time.perf_counter() - start_3
+        # elapsed_time_3 = str(timedelta(seconds=execution_time_3)).split('.')[0]
+        # logger.info(f"Simulation files ingestion time: {elapsed_time_3}\n")
     else:
         logger.info("No new or modified datasets found. Skipping files ingestion...\n")
 
