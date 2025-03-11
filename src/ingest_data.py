@@ -628,7 +628,7 @@ def create_topology_table(
                 )
             dataset_obj = session.exec(statement_dataset).first()
             if not dataset_obj:
-                print(
+                logger.debug(
                     f"Dataset with id_in_origin {dataset_id_in_origin}"
                     f" and origin {dataset_origin} not found."
                     )
@@ -655,15 +655,15 @@ def create_topology_table(
             )
             files = session.exec(statement_file).all()
             if len(files) > 1:
-                print(
+                logger.debug(
                     f"Multiple files found with dataset_id {dataset_obj.dataset_id}"
                     f" and file name {gro_file_name}. Skipping..."
                     )
-                print(files)
+                # print(files)
                 continue
             file_obj = session.exec(statement_file).first()
             if not file_obj:
-                print(
+                logger.debug(
                     f"File with dataset_id {dataset_obj.dataset_id}"
                     f" and file name {gro_file_name} not found."
                     )
@@ -711,7 +711,7 @@ def create_parameters_table(
                 )
             dataset_obj = session.exec(statement).first()
             if not dataset_obj:
-                print(
+                logger.debug(
                     f"Dataset with id_in_origin {dataset_id_in_origin}"
                     f" and origin {dataset_origin} not found."
                     )
@@ -730,15 +730,15 @@ def create_parameters_table(
             )
             files = session.exec(statement_file).all()
             if len(files) > 1:
-                print(
+                logger.debug(
                     f"Multiple files found with dataset_id {dataset_obj.dataset_id}"
                     f" and file name {mdp_file_name}. Skipping..."
                     )
-                print(files)
+                # print(files)
                 continue
             file_obj = session.exec(statement_file).first()
             if not file_obj:
-                print(
+                logger.debug(
                     f"File with dataset_id {dataset_obj.dataset_id}"
                     f" and file name {mdp_file_name} not found."
                     )
@@ -822,11 +822,11 @@ def create_trajectory_table(
             )
             files = session.exec(statement_file).all()
             if len(files) > 1:
-                print(
+                logger.debug(
                     f"Multiple files found with dataset_id {dataset_obj.dataset_id}"
                     f" and file name {xtc_file_name}. Skipping..."
                     )
-                print(files)
+                # print(files)
                 continue
             file_obj = session.exec(statement_file).first()
             if not file_obj:
