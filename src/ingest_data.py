@@ -134,7 +134,7 @@ def delete_files_for_update(engine: Engine, new_or_modified_datasets: list[int])
     logger.info(f"Total rows from FILES deleted from updated datasets: {result_files.rowcount}")
     logger.info(f"Total rows from TRAJECTORY_FILES deleted: {result_trajectory.rowcount}")
     logger.info(f"Total rows from PARAMETER_FILES deleted: {result_parameter.rowcount}")
-    logger.info(f"Total rows from TOPOLOGY_FILES deleted: {result_topology.rowcount}")
+    logger.info(f"Total rows from TOPOLOGY_FILES deleted: {result_topology.rowcount}\n")
 
 # ============================================================================
 # Data loading functions
@@ -172,6 +172,10 @@ def load_datasets_data(parquet_path: str) -> pd.DataFrame:
     # We simply need to remove the space after the comma.
     datsets_df['author'] = datsets_df['author'].str.replace(", ", ",").str.replace(";", ",")
     datsets_df['keywords'] = datsets_df['keywords'].str.replace(", ", ",").str.replace("; ", ";").str.replace(",", ";")
+
+    # We want to make all keywords lowercase in order to avoid duplicates
+    # when we create the Keyword objects in the database.
+    datsets_df["keywords"] = datsets_df["keywords"].str.lower
 
     # Normally we'd expect all datasets to have at least one author, but it
     # seems that datasets from OSF might not have an author field.
@@ -804,7 +808,7 @@ def create_trajectory_table(
             if not dataset_obj:
                 logger.debug(
                     f"Dataset with id_in_origin {dataset_id_in_origin}"
-                    f" and origin {dataset_origin} not found.\n",
+                    f" and origin {dataset_origin} not found."
                     f"Skipping {xtc_file_name} (index: {index})..."
                     )
                 missing_files += 1
@@ -913,7 +917,7 @@ def data_ingestion():
         # Load the files data
         files_df = load_files_data(files_path)
         logger.info("New or modified datasets found.")
-        logger.info("Deleting files associated to modified datasets...\n")
+        logger.info("Deleting files associated to modified datasets...")
         delete_files_for_update(engine, new_or_modified_datasets)
 
         logger.info("Creating files tables...")
