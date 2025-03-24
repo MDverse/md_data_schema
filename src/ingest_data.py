@@ -76,7 +76,7 @@ def get_or_create_models_with_one_attribute(
     # We create a SQL statement to find the records in Model
     # with the same name as in the current row. This could give us
     # multiple rows from Model, but we only need one (.first()).
-    # result will be an instance of Model if the value
+    # The result will be an instance of Model if the value
     # already exists, or None if it doesn't.
     statement = select(Model).where(getattr(Model, attribute) == value)
     result = session.exec(statement).first()
@@ -175,7 +175,7 @@ def load_datasets_data(parquet_path: str) -> pd.DataFrame:
 
     # We want to make all keywords lowercase in order to avoid duplicates
     # when we create the Keyword objects in the database.
-    datsets_df["keywords"] = datsets_df["keywords"].str.lower
+    datsets_df["keywords"] = datsets_df["keywords"].str.lower()
 
     # Normally we'd expect all datasets to have at least one author, but it
     # seems that datasets from OSF might not have an author field.
@@ -890,6 +890,44 @@ def create_simulation_tables(
 # ============================================================================
 
 def data_ingestion():
+    """
+    Ingest data from parquet files into the database.
+
+    For the simplicity of understanding, we will bundle up certain tables under
+    the same function and "name":
+    - The "datasets tables" will include:
+        - Dataset
+        - Author
+        - DatasetOrigin
+        - Keyword
+    - The "files tables" will include:
+        - File
+        - FileType
+    - The "simulation tables" will include:
+        - TopologyFile
+        - ParameterFile
+        - TrajectoryFilen
+        - Thermostat
+        - Barostat
+        - Integrator
+
+    This function will ingest all the data in the following steps:
+    1) Populate the "datsets tables".
+        - Load the datasets data from the parquet file.
+        - Create or update the tables.
+        - Log the number of records created, updated, or ignored for Dataset.
+    2) Populate the "files" tables.
+        - Load the files data from the parquet file.
+        - Check the datasets that have been updated or added.
+            a) There are no new or modified datasets:
+                - Skip the "files" ingestion.
+            b) There are new or modified datasets:
+                - Delete the files associated to the modified datasets.
+                - Delete all the TopologyFile, ParameterFile, and TrajectoryFile tables.
+                - Create the files tables.
+                - Create the simulation tables.
+    3) Log the total data ingestion time.
+    """
     # Path to the parquet data files
     files_path = "data/parquet_files/files.parquet"
     datasets_path = "data/parquet_files/datasets.parquet"
@@ -921,7 +959,7 @@ def data_ingestion():
         delete_files_for_update(engine, new_or_modified_datasets)
 
         logger.info("Creating files tables...")
-        logger.info("File, FileType, Software tables")
+        logger.info("File, FileType tables")
         create_files_tables(files_df, engine, new_or_modified_datasets)
 
         execution_time_2 = time.perf_counter() - start_2

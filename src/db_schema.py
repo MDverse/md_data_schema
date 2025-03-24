@@ -182,7 +182,7 @@ class Dataset(SQLModel, table=True):
     # A dataset can have many files, authors, keywords, software and molecules
     # (although it can have zero molecules)
     # A dataset can have only one origin (not a list)
-    file: list["File"] = Relationship(back_populates="dataset")
+    file: list["File"] = Relationship(back_populates="dataset", cascade_delete=True)
     origin: Optional["DatasetOrigin"] = Relationship(back_populates="dataset")
     author: list["Author"] = Relationship(
         back_populates="dataset", link_model=DatasetAuthorLink
@@ -203,7 +203,7 @@ class File(SQLModel, table=True):
 
     # Attributes/Table columns -----------------------------------------------
     file_id: Optional[int] = Field(default=None, primary_key=True)
-    dataset_id: int = Field(foreign_key="datasets.dataset_id")
+    dataset_id: int = Field(foreign_key="datasets.dataset_id", ondelete="CASCADE")
     name: str
     file_type_id: int = Field(foreign_key="file_types.file_type_id")
     size_in_bytes: Optional[float] = Field(default=None)
@@ -229,9 +229,9 @@ class File(SQLModel, table=True):
     children: list["File"] = Relationship(back_populates="parent")
 
     dataset: Dataset = Relationship(back_populates="file")
-    topology_file: Optional["TopologyFile"] = Relationship(back_populates="file")
-    parameter_file: Optional["ParameterFile"] = Relationship(back_populates="file")
-    trajectory_file: Optional["TrajectoryFile"] = Relationship(back_populates="file")
+    topology_file: Optional["TopologyFile"] = Relationship(back_populates="file", cascade_delete=True)
+    parameter_file: Optional["ParameterFile"] = Relationship(back_populates="file", cascade_delete=True)
+    trajectory_file: Optional["TrajectoryFile"] = Relationship(back_populates="file", cascade_delete=True)
     file_type: "FileType" = Relationship(back_populates="file")
 
 
@@ -315,7 +315,7 @@ class TopologyFile(SQLModel, table=True):
 
     # File id is both the PK but also a FK to the Files table
     file_id: Optional[int] = Field(
-        default=None, primary_key=True, foreign_key="files.file_id"
+        default=None, primary_key=True, foreign_key="files.file_id", ondelete="CASCADE"
     )
     atom_number: int
     has_protein: bool
@@ -335,7 +335,7 @@ class ParameterFile(SQLModel, table=True):
     __tablename__ = "parameter_files"
 
     file_id: Optional[int] = Field(
-        default=None, primary_key=True, foreign_key="files.file_id"
+        default=None, primary_key=True, foreign_key="files.file_id", ondelete="CASCADE"
     )
     dt: Optional[float] = Field(default=None)
     nsteps: Optional[int] = Field(default=None)
@@ -355,7 +355,7 @@ class TrajectoryFile(SQLModel, table=True):
     __tablename__ = "trajectory_files"
 
     file_id: Optional[int] = Field(
-        default=None, primary_key=True, foreign_key="files.file_id"
+        default=None, primary_key=True, foreign_key="files.file_id", ondelete="CASCADE"
     )
     atom_number: int
     frame_number: int
