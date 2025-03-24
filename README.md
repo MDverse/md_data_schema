@@ -52,3 +52,12 @@ Populate the tables with the data from parquet files:
 ```sh
 uv run src/ingest_data.py
 ```
+### Information on the database
+
+Recieve the report on the number of rows and columns of the table of the database:
+
+```sh
+uv run report.py
+```
+
+This will create the file `report.log` with the information.
