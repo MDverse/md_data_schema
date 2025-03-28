@@ -61,3 +61,24 @@ uv run report.py
 ```
 
 This will create the file `report.log` with the information.
+
+
+### Re-ingesting simulation data
+
+If you wish to re-ingest data from any of the following tables:
+- **TopologyFile**
+- **ParameterFile** with **Thermostat**, **Integrator**, and **Barostat**
+- **TrajectoryFile**
+
+You can run this command:
+```sh
+uv run src/ingest_topol_files.py
+```
+or
+```sh
+uv run src/ingest_param_files.py
+```
+or
+```sh
+uv run src/ingest_traj_files.py
+```
