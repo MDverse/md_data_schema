@@ -79,71 +79,22 @@ class DatasetAuthorLink(SQLModel, table=True):
     )
 
 
-class DatasetMoleculeLink(SQLModel, table=True):
+class AuthorPaperLink(SQLModel, table=True):
     """
-    MtM link table between Dataset and Molecule
-    LOGIC: A dataset can have 0 or many molecules and if we have a molecule,
-    it is definitely in a dataset.
-    """
-
-    __tablename__ = "datasets_molecules_link"
-
-    dataset_id: Optional[int] = Field(
-        default=None, foreign_key="datasets.dataset_id", primary_key=True
-    )
-    molecule_id: Optional[int] = Field(
-        default=None, foreign_key="molecules.molecule_id", primary_key=True
-    )
-
-
-class MoleculeTopologyLink(SQLModel, table=True):
-    """
-    MtM link table between Molecule and TopologyFile
-    LOGIC: A molecule is definitely in one or more topology files and,
-    a topology file necessarily has one or more molecules.
+    MtM link table between Author and Paper
+    LOGIC: An author can have written none or many papers
+    (here an "author" can have written a paper or published a dataset) and,
+    a paper is definitely written by one or many authors.
     """
 
-    __tablename__ = "molecules_topologies_link"
+    __tablename__ = "authors_papers_link"
 
-    molecule_id: Optional[int] = Field(
-        default=None, foreign_key="molecules.molecule_id", primary_key=True
+    author_id: Optional[int] = Field(
+        default=None, foreign_key="authors.author_id", primary_key=True
     )
-    file_id: Optional[int] = Field(
-        default=None, foreign_key="topology_files.file_id", primary_key=True
+    paper_id: Optional[int] = Field(
+        default=None, foreign_key="papers.paper_id", primary_key=True
     )
-
-class DatasetKeywordLink(SQLModel, table=True):
-    """
-    MtM link table between Dataset and Molecule
-    LOGIC: A dataset can have 0 or many keywords and,
-    a keyword it is definitely in a dataset or many datasets.
-    """
-
-    __tablename__ = "datasets_keywords_link"
-
-    dataset_id: Optional[int] = Field(
-        default=None, foreign_key="datasets.dataset_id", primary_key=True
-    )
-    keyword_id: Optional[int] = Field(
-        default=None, foreign_key="keywords.keyword_id", primary_key=True
-    )
-
-class DatasetSoftwareLink(SQLModel, table=True):
-    """
-    MtM link table between Dataset and Software
-    LOGIC: A dataset can have 0 or many software and,
-    a software it is definitely in a dataset or many datasets.
-    """
-
-    __tablename__ = "datasets_softwares_link"
-
-    dataset_id: Optional[int] = Field(
-        default=None, foreign_key="datasets.dataset_id", primary_key=True
-    )
-    software_id: Optional[int] = Field(
-        default=None, foreign_key="software.software_id", primary_key=True
-    )
-
 
 # ============================================================================
 # Main Tables
@@ -163,11 +114,15 @@ class Dataset(SQLModel, table=True):
 
     # Attributes/Table columns -----------------------------------------------
     dataset_id: Optional[int] = Field(default=None, primary_key=True)
-    origin_id: int = Field(foreign_key="dataset_origins.origin_id")
-    id_in_origin: str
+    data_source_id: int = Field(foreign_key="data_sources.data_source_id")
+    id_in_data_source: str
+    url_in_data_soure: Optional[str] = Field(default=None)
+    project_id: Optional[int] = Field(default=None, foreign_key="projects.project_id")
+    id_in_project: Optional[str] = Field(default=None)
+    url_in_project: Optional[str] = Field(default=None)
     doi: Optional[str] = Field(default=None)
-    date_created: str  # YYYY-MM-DD format
-    date_last_modified: str  # YYYY-MM-DD format
+    date_created: Optional[str] = None  # YYYY-MM-DD format
+    date_last_modified: Optional[str] = None  # YYYY-MM-DD format
     date_last_crawled: str  # ("%Y-%m-%dT%H:%M:%S")
     file_number: int = 0
     download_number: int = 0
@@ -176,27 +131,22 @@ class Dataset(SQLModel, table=True):
     url: str
     title: str
     description: Optional[str] = None
+    keywords: Optional[str] = None
 
-    # Relationships: files, origins, authors, molecules, keywords, software --
+    # Relationships: files, data_sources, authors, projects, annotations -----
 
     # A dataset can have many files, authors, keywords, software and molecules
     # (although it can have zero molecules)
     # A dataset can have only one origin (not a list)
     file: list["File"] = Relationship(back_populates="dataset", cascade_delete=True)
-    origin: Optional["DatasetOrigin"] = Relationship(back_populates="dataset")
-    author: list["Author"] = Relationship(
+    data_source: "DataSource" = Relationship(back_populates="dataset")
+    author: Optional[list["Author"]] = Relationship(
         back_populates="dataset", link_model=DatasetAuthorLink
     )
-    molecule: Optional[list["Molecule"]] = Relationship(
-        back_populates="dataset", link_model=DatasetMoleculeLink
+    project: Optional["Project"] = Relationship(back_populates="dataset")
+    annotation: Optional[list["Annotation"]] = Relationship(
+        back_populates="dataset", cascade_delete=True
     )
-    keyword: Optional[list["Keyword"]] = Relationship(
-        back_populates="dataset", link_model=DatasetKeywordLink
-    )
-    software: Optional[list["Software"]] = Relationship(
-        back_populates="dataset", link_model=DatasetSoftwareLink
-    )
-
 
 class File(SQLModel, table=True):
     __tablename__ = "files"
@@ -250,11 +200,73 @@ class Author(SQLModel, table=True):
     )
 
 
+class Annotation(SQLModel, table=True):
+    __tablename__ = "annotations"
+
+    # Attributes/Table columns -----------------------------------------------
+    annotation_id: Optional[int] = Field(default=None, primary_key=True)
+    dataset_id: int = Field(foreign_key="datasets.dataset_id")
+    provenance_type_id: int = Field(foreign_key="provenance_types.provenance_id")
+    annotation_type_id: int = Field(foreign_key="annotation_types.annotation_type_id")
+    file_id: Optional[int] = Field(foreign_key="files.file_id", default=None)
+    paper_id: Optional[int] = Field(foreign_key="papers.paper_id", default=None)
+    value: str
+    quality_score: Optional[str] = Field(default=None)
+    value_extra: Optional[str] = Field(default=None)
+    comment: Optional[str] = Field(default=None)
+
+    # Relationships: datasets, provenance_types, annotation_types, -----------
+    # files, papers
+    
+    dataset: "Dataset" = Relationship(back_populates="annotation", cascade_delete=True)
+    provenance_type: Optional["ProvenanceType"] = Relationship(
+        back_populates="provenance")
+    annotation_type: Optional["AnnotationType"] = Relationship(
+        back_populates="annotation")
+    file: Optional["File"] = Relationship(back_populates="annotation")
+    paper: Optional["Paper"] = Relationship(back_populates="annotation")
+
+
+class Paper(SQLModel, table=True):
+    __tablename__ = "papers"
+
+    # Attributes/Table columns -----------------------------------------------
+    paper_id: Optional[int] = Field(default=None, primary_key=True)
+    doi: Optional[str] = Field(default=None)
+    title: str
+    abstract: Optional[str] = Field(default=None)
+    journal: str
+    url: Optional[str] = Field(default=None)
+    year: Optional[str] = None  # YYYY
+    keywords: Optional[str] = None
+
+    # Relationships: authors, annotations
+
+    annotation: Optional[list[Annotation]] = Relationship(
+        back_populates="paper", cascade_delete=True
+    )
+
+
+class Project(SQLModel, table=True):
+    __tablename__ = "projects"
+
+    # Attributes/Table columns -----------------------------------------------
+    project_id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+    url: str
+    comment: Optional[str] = Field(default=None)
+    citation: Optional[str] = Field(default=None)
+
+    # Relationships: datasets
+    dataset: list["Dataset"] = Relationship(back_populates="project")
+
+
 class Molecule(SQLModel, table=True):
     __tablename__ = "molecules"
 
     # Attributes/Table columns -----------------------------------------------
     molecule_id: Optional[int] = Field(default=None, primary_key=True)
+    annotation_id: int = Field(foreign_key="annotations.annotation_id")
     name: str
     formula: str
     sequence: str
@@ -262,14 +274,8 @@ class Molecule(SQLModel, table=True):
         foreign_key="molecule_types.molecule_type_id"
     )
 
-    # Relationships: datasets, topology_files, -------------------------------
-    # molecules_external_db, molecule_types
-
-    dataset: list[Dataset] = Relationship(
-        back_populates="molecule", link_model=DatasetMoleculeLink)
-    topology_file: list["TopologyFile"] = Relationship(
-        back_populates="molecule", link_model=MoleculeTopologyLink
-    )
+    # Relationships: annotations, molecule_types, molecules_external_db ------
+    annotation: "Annotation" = Relationship(back_populates="annotation")
     mol_ext_db: Optional[list["MoleculeExternalDb"]] = Relationship(
         back_populates="molecule"
     )
@@ -326,9 +332,6 @@ class TopologyFile(SQLModel, table=True):
 
     # Relationships: files, molecules
     file: File = Relationship(back_populates="topology_file")
-    molecule: list[Molecule] = Relationship(
-        back_populates="topology_file", link_model=MoleculeTopologyLink
-    )
 
 
 class ParameterFile(SQLModel, table=True):
@@ -340,16 +343,12 @@ class ParameterFile(SQLModel, table=True):
     dt: Optional[float] = Field(default=None)
     nsteps: Optional[int] = Field(default=None)
     temperature: Optional[float] = Field(default=None)
-    thermostat_id: Optional[int] = Field(foreign_key="thermostats.thermostat_id")
-    barostat_id: Optional[int] = Field(foreign_key="barostats.barostat_id")
-    integrator_id: Optional[int] = Field(foreign_key="integrators.integrator_id")
+    thermostat: Optional[str] = Field(default=None)
+    barostat: Optional[str] = Field(default=None)
+    integrator: Optional[str] = Field(default=None)
 
     # Relationships: files, thermostats, barostats, integrators
     file: File = Relationship(back_populates="parameter_file")
-    thermostat: Optional["Thermostat"] = Relationship(back_populates="parameter_file")
-    barostat: Optional["Barostat"] = Relationship(back_populates="parameter_file")
-    integrator: Optional["Integrator"] = Relationship(back_populates="parameter_file")
-
 
 class TrajectoryFile(SQLModel, table=True):
     __tablename__ = "trajectory_files"
@@ -378,23 +377,12 @@ simulations, the different types of molecules, etc.
 These tables have a one-to-many relationship with the main tables.
 """
 
-class Keyword(SQLModel, table=True):
-    __tablename__ = "keywords"
-
-    # Attributes/Table columns -----------------------------------------------
-    keyword_id: Optional[int] = Field(default=None, primary_key=True)
-    entry: str = Field(unique=True)
-
-    # Relationships: datasets
-    dataset: list[Dataset] = Relationship(
-        back_populates="keyword", link_model=DatasetKeywordLink
-        )
-
 class FileType(SQLModel, table=True):
     __tablename__ = "file_types"
 
     file_type_id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
+    comment: Optional[str] = Field(default=None)
 
     # Relationships: files
     file: list[File] = Relationship(back_populates="file_type")
@@ -405,6 +393,7 @@ class MoleculeType(SQLModel, table=True):
 
     molecule_type_id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
+    comment: Optional[str] = Field(default=None)
 
     # Relationships: molecules
     molecule: list[Molecule] = Relationship(back_populates="molecule_type")
@@ -415,65 +404,46 @@ class Database(SQLModel, table=True):
 
     database_id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
+    url: Optional[str] = Field(default=None)
+    comment: Optional[str] = Field(default=None)
 
     # Relationships: molecules_external_db
     mol_ext_db: list[MoleculeExternalDb] = Relationship(back_populates="database")
 
 
-class DatasetOrigin(SQLModel, table=True):
-    __tablename__ = "dataset_origins"
+class DataSource(SQLModel, table=True):
+    __tablename__ = "data_sources"
 
-    origin_id: Optional[int] = Field(default=None, primary_key=True)
+    data_source_id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
+    url: Optional[str] = Field(default=None)
+    citation: Optional[str] = Field(default=None)
+    comment: Optional[str] = Field(default=None)
 
     # Relationships: datasets
-    dataset: list[Dataset] = Relationship(back_populates="origin")
+    dataset: list[Dataset] = Relationship(back_populates="data_source")
 
+class ProvenanceType(SQLModel, table=True):
+    __tablename__ = "provenance_types"
 
-class Software(SQLModel, table=True):
-    __tablename__ = "software"
-    __table_args__ = (UniqueConstraint("name", "version"),)
+    provenance_id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+    comment: Optional[str] = Field(default=None)
 
+    # Relationships: annotations
+    provenance: list[Annotation] = Relationship(back_populates="provenance_type")
 
-    software_id: Optional[int] = Field(default=None, primary_key=True)
+class AnnotationType(SQLModel, table=True):
+    __tablename__ = "annotation_types"
+    __table_args__ = (UniqueConstraint("name", "label"),)
+
+    annotation_type_id: Optional[int] = Field(default=None, primary_key=True)
+    label: str
     name: str
-    version: Optional[str] = Field(default=None)
+    comment: Optional[str] = Field(default=None)
 
-    # Relationships: files
-    dataset: list[Dataset] = Relationship(
-        back_populates="software", link_model=DatasetSoftwareLink
-    )
-
-
-class Thermostat(SQLModel, table=True):
-    __tablename__ = "thermostats"
-
-    thermostat_id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(unique=True)
-
-    # Relationships: parameter_files
-    parameter_file: list[ParameterFile] = Relationship(back_populates="thermostat")
-
-
-class Barostat(SQLModel, table=True):
-    __tablename__ = "barostats"
-
-    barostat_id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(unique=True)
-
-    # Relationships: parameter_files
-    parameter_file: list[ParameterFile] = Relationship(back_populates="barostat")
-
-
-class Integrator(SQLModel, table=True):
-    __tablename__ = "integrators"
-
-    integrator_id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(unique=True)
-
-    # Relationships: parameter_files
-    parameter_file: list[ParameterFile] = Relationship(back_populates="integrator")
-
+    # Relationships: annotations
+    annotation: list[Annotation] = Relationship(back_populates="annotation_type")
 
 # ============================================================================
 # Engine
