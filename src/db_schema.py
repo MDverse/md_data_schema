@@ -116,7 +116,7 @@ class Dataset(SQLModel, table=True):
     dataset_id: Optional[int] = Field(default=None, primary_key=True)
     data_source_id: int = Field(foreign_key="data_sources.data_source_id")
     id_in_data_source: str
-    url_in_data_soure: Optional[str] = Field(default=None)
+    url_in_data_source: Optional[str] = Field(default=None)
     project_id: Optional[int] = Field(default=None, foreign_key="projects.project_id")
     id_in_project: Optional[str] = Field(default=None)
     url_in_project: Optional[str] = Field(default=None)
@@ -128,7 +128,6 @@ class Dataset(SQLModel, table=True):
     download_number: int = 0
     view_number: int = 0
     license: Optional[str] = Field(default=None)
-    url: str
     title: str
     description: Optional[str] = None
     keywords: Optional[str] = None
@@ -145,7 +144,7 @@ class Dataset(SQLModel, table=True):
     )
     project: Optional["Project"] = Relationship(back_populates="dataset")
     annotation: Optional[list["Annotation"]] = Relationship(
-        back_populates="dataset", cascade_delete=True
+        back_populates="dataset"
     )
 
 class File(SQLModel, table=True):
@@ -183,7 +182,9 @@ class File(SQLModel, table=True):
     parameter_file: Optional["ParameterFile"] = Relationship(back_populates="file", cascade_delete=True)
     trajectory_file: Optional["TrajectoryFile"] = Relationship(back_populates="file", cascade_delete=True)
     file_type: "FileType" = Relationship(back_populates="file")
-
+    annotation: Optional[list["Annotation"]] = Relationship(
+        back_populates="file", cascade_delete=True
+    )
 
 class Author(SQLModel, table=True):
     __tablename__ = "authors"
@@ -218,13 +219,16 @@ class Annotation(SQLModel, table=True):
     # Relationships: datasets, provenance_types, annotation_types, -----------
     # files, papers
     
-    dataset: "Dataset" = Relationship(back_populates="annotation", cascade_delete=True)
+    dataset: "Dataset" = Relationship(back_populates="annotation")
     provenance_type: Optional["ProvenanceType"] = Relationship(
         back_populates="provenance")
     annotation_type: Optional["AnnotationType"] = Relationship(
         back_populates="annotation")
     file: Optional["File"] = Relationship(back_populates="annotation")
     paper: Optional["Paper"] = Relationship(back_populates="annotation")
+    molecule: Optional["Molecule"] = Relationship(
+        back_populates="annotation", cascade_delete=True
+    )
 
 
 class Paper(SQLModel, table=True):
@@ -275,7 +279,7 @@ class Molecule(SQLModel, table=True):
     )
 
     # Relationships: annotations, molecule_types, molecules_external_db ------
-    annotation: "Annotation" = Relationship(back_populates="annotation")
+    annotation: "Annotation" = Relationship(back_populates="molecule")
     mol_ext_db: Optional[list["MoleculeExternalDb"]] = Relationship(
         back_populates="molecule"
     )
@@ -449,7 +453,7 @@ class AnnotationType(SQLModel, table=True):
 # Engine
 # ============================================================================
 
-sqlite_file_name = "database.db"
+sqlite_file_name = "database_testing.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 engine = create_engine(sqlite_url)

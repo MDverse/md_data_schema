@@ -13,15 +13,11 @@ from datetime import timedelta
 from db_schema import (
     engine,
     Author,
-    Barostat,
     Dataset,
-    DatasetOrigin,
+    DataSource,
     File,
     FileType,
-    Integrator,
-    Keyword,
     ParameterFile,
-    Thermostat,
     TopologyFile,
     TrajectoryFile,
 )
@@ -46,6 +42,8 @@ uv run python src/ingest_data.py
 # ============================================================================
 # Logger configuration
 # ============================================================================
+
+
 logger.remove()
 # Terminal format
 logger.add(
@@ -63,6 +61,7 @@ logger.add(
     level="DEBUG",
 )
 
+
 # ============================================================================
 # Helper functions
 # ============================================================================
@@ -72,6 +71,7 @@ def get_or_create_models_with_one_attribute(
     Model: SQLModel,
     attribute: str,
     value: str,
+    additional_data: dict = None
     ) -> SQLModel:
     # We create a SQL statement to find the records in Model
     # with the same name as in the current row. This could give us
@@ -80,11 +80,14 @@ def get_or_create_models_with_one_attribute(
     # already exists, or None if it doesn't.
     statement = select(Model).where(getattr(Model, attribute) == value)
     result = session.exec(statement).first()
-    # Basically if the value doesn't exist, we create a new one
+    # If the value doesn't exist, we create a new one
     # in the Model table and commit the changes.
     if not result:
-        result = Model()
-        setattr(result, attribute, value)
+        # Prepare the data for the new instance
+        data = {attribute: value}
+        if additional_data:
+            data.update(additional_data)
+        result = Model(**data)
         session.add(result)
         session.commit()
         session.refresh(result)
@@ -136,6 +139,7 @@ def delete_files_for_update(engine: Engine, new_or_modified_datasets: list[int])
     logger.info(f"Total rows from PARAMETER_FILES deleted: {result_parameter.rowcount}")
     logger.info(f"Total rows from TOPOLOGY_FILES deleted: {result_topology.rowcount}\n")
 
+
 # ============================================================================
 # Data loading functions
 # ============================================================================
@@ -159,10 +163,11 @@ def load_datasets_data(parquet_path: str) -> pd.DataFrame:
         'keywords',
         'description'
     ]].rename(columns={
-        'dataset_id': 'id_in_origin',
+        'dataset_origin': 'data_source',
+        'dataset_id': 'id_in_data_source',
         'date_creation': 'date_created',
         'date_fetched': 'date_last_crawled',
-        'dataset_url': 'url'
+        'dataset_url': 'url_in_data_source'
     })
 
     # Normalize author and keywords strings
@@ -182,6 +187,19 @@ def load_datasets_data(parquet_path: str) -> pd.DataFrame:
     # We need to account for that by replacing NaN with an empty string.
     datsets_df["author"] = datsets_df["author"].apply(lambda x: x if pd.notna(x) else "")
     datsets_df["keywords"] = datsets_df["keywords"].apply(lambda x: x if pd.notna(x) else "")
+
+    # The column 'data_source' is the name of the data source
+    # We want to add a new column "data_source_url" that will contain the URL
+    # of the data source.
+    # If the row is "zenodo", the URL will be "https://zenodo.org/"
+    # If the row is "figshare", the URL will be "https://figshare.com/"
+    # If the row is "osf", the URL will be "https://osf.io/"
+    datsets_df['data_source_url'] = datsets_df['data_source'].map({
+        'zenodo': 'https://zenodo.org/',
+        'figshare': 'https://figshare.com/',
+        'osf': 'https://osf.io/'
+    })
+
     return datsets_df
 
 def load_files_data(parquet_path: str) -> pd.DataFrame:
@@ -197,7 +215,8 @@ def load_files_data(parquet_path: str) -> pd.DataFrame:
         'from_zip_file',
         'origin_zip_file'
     ]].rename(columns={
-        'dataset_id': 'dataset_id_in_origin',
+        'dataset_origin': 'data_source',
+        'dataset_id': 'dataset_id_in_data_source',
         'file_type': 'type',
         'file_name': 'name',
         'file_size': 'size_in_bytes',
@@ -226,7 +245,8 @@ def load_topology_data(parquet_path_topology: str) -> pd.DataFrame:
         'has_glucid',
         "has_water_ion"
         ]].rename(columns={
-            'dataset_id': 'dataset_id_in_origin',
+            'dataset_origin': 'data_source',
+            'dataset_id': 'dataset_id_in_data_source',
             'file_name': 'name'
             })
 
@@ -250,7 +270,8 @@ def load_parameter_data(parquet_path_parameters: str) -> pd.DataFrame:
         'barostat',
         'integrator'
         ]].rename(columns={
-            'dataset_id': 'dataset_id_in_origin',
+            'dataset_origin': 'data_source',
+            'dataset_id': 'dataset_id_in_data_source',
             'file_name': 'name'
             })
     
@@ -273,16 +294,16 @@ def load_trajectory_data(parquet_path_trajectory: str) -> pd.DataFrame:
     'atom_number',
     'frame_number'
     ]].rename(columns={
-        'dataset_id': 'dataset_id_in_origin',
+        'dataset_origin': 'data_source',
+        'dataset_id': 'dataset_id_in_data_source',
         'file_name': 'name'
         })
 
     return trajectory_df
 
 
-
 # ============================================================================
-# Dataset, Author, DatasetOrigin
+# Dataset, Author, DataSource
 # ============================================================================
 
 def create_or_update_datasets_authors_origins_tables(
@@ -294,7 +315,7 @@ def create_or_update_datasets_authors_origins_tables(
 
     This function processes a DataFrame containing dataset information and
     updates the database accordingly. It handles the creation and updating
-    of Dataset, Author, DatasetOrigin, and Keyword entries.
+    of Dataset, Author, DataSource, and Keyword entries.
 
     Args:
         datasets_df (pd.DataFrame): DataFrame containing dataset information.
@@ -304,7 +325,7 @@ def create_or_update_datasets_authors_origins_tables(
         None
 
     Process:
-        - Inserts new records into the Dataset, Author, DatasetOrigin,
+        - Inserts new records into the Dataset, Author, DataSource,
         and Keyword tables.
         - Updates existing records if changes are detected.
         - Logs the number of records created, updated, or ignored.
@@ -327,10 +348,17 @@ def create_or_update_datasets_authors_origins_tables(
             unit="row"
             ):
 
-            # --- Handle DatasetOrigin (one-to-many relationship) ---
-            origin_name = row["dataset_origin"]
+            # --- Handle DataSource (one-to-many relationship) ---
+            origin_name = row["data_source"]
+            origin_url = row["data_source_url"]
+            dict_to_add_data_source = {
+                "url": origin_url,
+                "citation": None,  # CURRENTLY we don't have a citation
+                "comment": None,  # CURRENTLY we don't have a comment
+            }
             origin_obj = get_or_create_models_with_one_attribute(
-                session, DatasetOrigin, "name", origin_name)
+                session, DataSource, "name", origin_name, dict_to_add_data_source)
+            
 
 
             # --- Handle Author(s) (many-to-many relationship) ---
@@ -349,32 +377,24 @@ def create_or_update_datasets_authors_origins_tables(
             # database or newly created), we use the following command to
             # add the Author object to our authors list (list of Author
             # objects for the current dataset).
-            authors = [get_or_create_models_with_one_attribute(session, Author, "name", name) for name in author_names]
+            dict_to_add_author = {
+                "orcid": None,  # CURRENTLY we don't have an ORCID
+            }
+            authors = [get_or_create_models_with_one_attribute(session, Author, "name", name, dict_to_add_author) for name in author_names]
 
-
-            # --- Handle Keyword(s) (many-to-many relationship) ---
-            # If there are multiple keywords separated by a delimiter (";"),
-            # split and process them accordingly.
-            # This also removes any leading/trailing whitespace
-            # from between each keyword.
-            keyword_entries = []
-            for keyword in [kw.strip() for kw in row["keywords"].split(";") if kw.strip()]:
-                keyword_obj = get_or_create_models_with_one_attribute(session, Keyword, "entry", keyword)
-                if keyword_obj not in keyword_entries:
-                    keyword_entries.append(keyword_obj)
 
             # --- Check if the Dataset already exists ---
-            # Uniqueness is determined by (origin, id_in_origin)
+            # Uniqueness is determined by (origin, id_in_data_source)
             dataset_statement = select(Dataset).where(
-                (Dataset.id_in_origin == row["id_in_origin"]) &
-                (Dataset.origin_id == origin_obj.origin_id)
+                (Dataset.id_in_data_source == row["id_in_data_source"]) &
+                (Dataset.data_source_id == origin_obj.data_source_id)
             )
             existing_dataset = session.exec(dataset_statement).first()
 
             if not existing_dataset: # If the dataset doesn't exist, create it.
             # --- Create the new Dataset entry ---
                 new_dataset_obj = Dataset(
-                    id_in_origin=row["id_in_origin"],
+                    id_in_data_source=row["id_in_data_source"],
                     doi=row["doi"],
                     date_created=row["date_created"],
                     date_last_modified=row["date_last_modified"],
@@ -383,12 +403,12 @@ def create_or_update_datasets_authors_origins_tables(
                     download_number=row["download_number"],
                     view_number=row["view_number"],
                     license=row["license"],
-                    url=row["url"],
+                    url_in_data_source=row["url_in_data_source"],
                     title=row["title"],
                     # use .get() if the field might be missing
                     keywords=row.get("keywords"),
                     description=row.get("description"),
-                    origin=origin_obj,   # assign the related origin
+                    data_source=origin_obj,   # assign the related origin
                 )
 
                 # Assign the many-to-many relationship for authors:
@@ -401,8 +421,8 @@ def create_or_update_datasets_authors_origins_tables(
                 # related to all these authors.
                 new_dataset_obj.author = authors
 
-                # Assign the many-to-many relationship for keywords:
-                new_dataset_obj.keyword = keyword_entries
+                # # Assign the many-to-many relationship for keywords:
+                # new_dataset_obj.keyword = keyword_entries
 
                 session.add(new_dataset_obj)
                 session.commit()
@@ -423,21 +443,22 @@ def create_or_update_datasets_authors_origins_tables(
                     # "download_number",
                     # "view_number",
                     # "license",
-                    "url",
+                    "url_in_data_source",
                     "title",
-                    'description',
+                    "description",
+                    "keywords",
                 ]
                 changed = update_dataset_fields(existing_dataset, row, fields_to_check)
 
 
                 # Compare many-to-many relationships for keywords and authors
                 # Keywords in the database
-                existing_keywords = {kw.entry for kw in existing_dataset.keyword}
-                # Keywords in the current row
-                new_keywords = {kw.entry for kw in keyword_entries}
-                if existing_keywords != new_keywords:
-                    existing_dataset.keyword = keyword_entries
-                    changed = True
+                # existing_keywords = {kw.entry for kw in existing_dataset.keyword}
+                # # Keywords in the current row
+                # new_keywords = {kw.entry for kw in keyword_entries}
+                # if existing_keywords != new_keywords:
+                #     existing_dataset.keyword = keyword_entries
+                #     changed = True
                 
                 # Authors in the database
                 existing_authors = {author.name for author in existing_dataset.author}
@@ -499,17 +520,17 @@ def create_files_tables(
             ):
 
             # --- Check if the File record already exists ---
-            dataset_id_in_origin = row["dataset_id_in_origin"]
-            dataset_origin = row["dataset_origin"]
-            dataset_stmt = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin,
+            dataset_id_in_data_source = row["dataset_id_in_data_source"]
+            data_source = row["data_source"]
+            dataset_stmt = select(Dataset).join(DataSource).where(
+                Dataset.id_in_data_source == dataset_id_in_data_source,
+                DataSource.name == data_source,
             )
             current_dataset = session.exec(dataset_stmt).first()
             if not current_dataset:
                     logger.debug(
-                        f"Dataset with id_in_origin {dataset_id_in_origin}",
-                        f" and origin {dataset_origin} not found."
+                        f"Dataset with id_in_data_source {dataset_id_in_data_source}",
+                        f" and origin {data_source} not found."
                         )
                     continue  # Skip if not found
 
@@ -525,7 +546,10 @@ def create_files_tables(
 
                 # --- Handle FileType (one-to-many relationship) ---
                 file_type_name = row["type"]
-                type_obj = get_or_create_models_with_one_attribute(session, FileType, "name", file_type_name)
+                dict_to_add_file_type = {
+                    "comment": None,  # CURRENTLY we don't have a comment
+                }
+                type_obj = get_or_create_models_with_one_attribute(session, FileType, "name", file_type_name, dict_to_add_file_type)
 
 
                 # --- Handle Recursive File (parent-child relationship) ---
@@ -624,17 +648,17 @@ def create_topology_table(
             unit="row",
             ):
 
-            dataset_id_in_origin = row["dataset_id_in_origin"]
-            dataset_origin = row["dataset_origin"]
-            statement_dataset = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin
+            dataset_id_in_data_source = row["dataset_id_in_data_source"]
+            data_source = row["data_source"]
+            statement_dataset = select(Dataset).join(DataSource).where(
+                Dataset.id_in_data_source == dataset_id_in_data_source,
+                DataSource.name == data_source
                 )
             dataset_obj = session.exec(statement_dataset).first()
             if not dataset_obj:
                 logger.debug(
-                    f"Dataset with id_in_origin {dataset_id_in_origin}"
-                    f" and origin {dataset_origin} not found."
+                    f"Dataset with id_in_data_source {dataset_id_in_data_source}"
+                    f" and origin {data_source} not found."
                     )
                 continue  # Skip if not found
             dataset_id = dataset_obj.dataset_id
@@ -707,17 +731,17 @@ def create_parameters_table(
             unit="row",
         ):
 
-            dataset_id_in_origin = row["dataset_id_in_origin"]
-            dataset_origin = row["dataset_origin"]
-            statement = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin
+            dataset_id_in_data_source = row["dataset_id_in_data_source"]
+            data_source = row["data_source"]
+            statement = select(Dataset).join(DataSource).where(
+                Dataset.id_in_data_source == dataset_id_in_data_source,
+                DataSource.name == data_source
                 )
             dataset_obj = session.exec(statement).first()
             if not dataset_obj:
                 logger.debug(
-                    f"Dataset with id_in_origin {dataset_id_in_origin}"
-                    f" and origin {dataset_origin} not found."
+                    f"Dataset with id_in_data_source {dataset_id_in_data_source}"
+                    f" and origin {data_source} not found."
                     )
                 continue  # Skip if not found
             dataset_id = dataset_obj.dataset_id
@@ -749,33 +773,15 @@ def create_parameters_table(
                 continue  # Skip if not found
             file_id_in_files = file_obj.file_id
 
-
-            # -- Handle Thermostat, Barostat, Integrator --
-            # Thermostat
-            thermostat = row.get("thermostat", None)
-            thermostat_obj = get_or_create_models_with_one_attribute(
-                session, Thermostat, "name", thermostat)
-
-            # Barostat
-            barostat = row.get("barostat", None)
-            barostat_obj = get_or_create_models_with_one_attribute(
-                session, Barostat, "name", barostat)
-
-            # Integrator
-            integrator = row.get("integrator", None)
-            integrator_obj = get_or_create_models_with_one_attribute(
-                session, Integrator, "name", integrator)
-
-
             # -- Create the ParameterFile --
             parameter_obj = ParameterFile(
                 file_id=file_id_in_files,
                 dt=row["dt"],
                 nsteps=row["nsteps"],
                 temperature=row["temperature"],
-                thermostat_id=thermostat_obj.thermostat_id,
-                barostat_id=barostat_obj.barostat_id,
-                integrator_id=integrator_obj.integrator_id
+                thermostat=row["thermostat"],
+                barostat=row["barostat"],
+                integrator=row["integrator"]
             )
 
             session.add(parameter_obj)
@@ -798,17 +804,17 @@ def create_trajectory_table(
             ):
             xtc_file_name = row["name"]
 
-            dataset_id_in_origin = row["dataset_id_in_origin"]
-            dataset_origin = row["dataset_origin"]
-            statement = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin
+            dataset_id_in_data_source = row["dataset_id_in_data_source"]
+            data_source = row["data_source"]
+            statement = select(Dataset).join(DataSource).where(
+                Dataset.id_in_data_source == dataset_id_in_data_source,
+                DataSource.name == data_source
                 )
             dataset_obj = session.exec(statement).first()
             if not dataset_obj:
                 logger.debug(
-                    f"Dataset with id_in_origin {dataset_id_in_origin}"
-                    f" and origin {dataset_origin} not found."
+                    f"Dataset with id_in_data_source {dataset_id_in_data_source}"
+                    f" and origin {data_source} not found."
                     f"Skipping {xtc_file_name} (index: {index})..."
                     )
                 missing_files += 1
@@ -898,7 +904,7 @@ def data_ingestion():
     - The "datasets tables" will include:
         - Dataset
         - Author
-        - DatasetOrigin
+        - DataSource
         - Keyword
     - The "files tables" will include:
         - File
@@ -940,7 +946,7 @@ def data_ingestion():
     datasets_df = load_datasets_data(datasets_path)
 
     logger.info("Creating or updating datasets tables...")
-    logger.info("Dataset, Author, DatasetOrigin, Keyword tables")
+    logger.info("Dataset, Author, DataSource, Keyword tables")
     new_or_modified_datasets = create_or_update_datasets_authors_origins_tables(datasets_df, engine)
 
     execution_time_1 = time.perf_counter() - start_1
