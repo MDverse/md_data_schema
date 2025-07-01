@@ -5,15 +5,11 @@ from pathlib import Path
 from src.db_schema import (
     engine,
     Author,
-    Barostat,
     Dataset,
-    DatasetOrigin,
+    DataSource,
     File,
     FileType,
-    Integrator,
-    Keyword,
     ParameterFile,
-    Thermostat,
     TopologyFile,
     TrajectoryFile,
 )
@@ -37,16 +33,12 @@ def main():
     # List of all the models you want to report on.
     models = [
         Dataset,
-        DatasetOrigin,
+        DataSource,
         Author,
-        Keyword,
         File,
         FileType,
         TopologyFile,
         ParameterFile,
-        Thermostat,
-        Barostat,
-        Integrator,
         TrajectoryFile,
     ]
 
