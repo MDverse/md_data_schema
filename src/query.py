@@ -7,16 +7,13 @@ from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
 from db_schema import engine
-from db_schema import Dataset, DatasetOrigin, File, FileType
+from db_schema import Dataset, DataSource, File, FileType
 
 """Purpose
 This script demonstrates how to query the database to extract and print
-information. There currently are two functions in this script:
-1. print_dataset_origin_summary: Prints a summary of the dataset origins.
-2. save_dataset_origin_zenodo: Extracts and saves all datasets with origin
-"zenodo" as a pandas dataframe.
+information.
 
-We also measure the execution time of the script in order to get an idea of
+We measure the execution time of the script in order to get an idea of
 how long it takes to complete a query on the database.
 
 To launch this script, use the command:
@@ -26,9 +23,9 @@ uv run python src/query.py
 start = time.perf_counter()
 
 
-def print_dataset_origin_summary():
+def print_data_source_summary():
     """
-    Prints a summary of the dataset origins. For each origin,
+    Prints a summary of the dataset data source. For each data source,
     it prints the number of datasets, the first dataset creation date,
     and the last dataset creation date.
 
@@ -38,18 +35,18 @@ def print_dataset_origin_summary():
     """
 
     with Session(engine) as session:
-        # Build a query that joins DatasetOrigin and Dataset,
-        # groups by origin name, and aggregates the data.
+        # Build a query that joins DataSource and Dataset,
+        # groups by data source name, and aggregates the data.
         statement = (
             select(
-                DatasetOrigin.name.label("dataset_origin"),
+                DataSource.name.label("dataset_data_source"),
                 func.count(Dataset.dataset_id).label("number_of_datasets"),
                 func.min(Dataset.date_created).label("first_dataset"),
                 func.max(Dataset.date_created).label("last_dataset"),
             )
             # We join on the relationship: dataset_origin.origin_id == dataset.origin_id
-            .join(Dataset, Dataset.origin_id == DatasetOrigin.origin_id)
-            .group_by(DatasetOrigin.name)
+            .join(Dataset, Dataset.data_source_id == DataSource.data_source_id)
+            .group_by(DataSource.name)
         )
 
         results = session.exec(statement).all()
@@ -70,7 +67,7 @@ def print_dataset_origin_summary():
             first_date = row.first_dataset if row.first_dataset else "None"
             last_date = row.last_dataset if row.last_dataset else "None"
             print(
-                f"{row.dataset_origin:<15}{row.number_of_datasets:<20}"
+                f"{row.dataset_data_source:<15}{row.number_of_datasets:<20}"
                 f"{first_date:<15}{last_date:<15}"
             )
 
@@ -86,8 +83,8 @@ def query_to_dataframe():
         # and filters to only those with DatasetOrigin.name == "zenodo"
         statement = (
             select(Dataset)
-            .join(DatasetOrigin, Dataset.origin_id == DatasetOrigin.origin_id)
-            .where(DatasetOrigin.name == "zenodo")
+            .join(DataSource, Dataset.data_source_id == DataSource.data_source_id)
+            .where(DataSource.name == "zenodo")
         )
         results = session.exec(statement).all()  # This returns SQLModel objects
 
@@ -115,16 +112,16 @@ def random_mdp_information():
         # - Filters for files whose name ends with ".mdp" (case-insensitive).
         statement = (
             select(
-                Dataset.id_in_origin,
-                Dataset.url,
-                DatasetOrigin.name.label("dataset_origin"),
+                Dataset.id_in_data_source,
+                Dataset.url_in_data_source,
+                DataSource.name.label("dataset_origin"),
                 File.name.label("file_name"),
                 File.size_in_bytes,
                 FileType.name.label("file_type"),
                 ParentFile.name.label("parent_file_name")
             )
             .join(Dataset, File.dataset_id == Dataset.dataset_id)
-            .join(DatasetOrigin, Dataset.origin_id == DatasetOrigin.origin_id)
+            .join(DataSource, Dataset.data_source_id == DataSource.data_source_id)
             .join(FileType, File.file_type_id == FileType.file_type_id)
             .outerjoin(ParentFile, File.parent_zip_file_id == ParentFile.file_id)
             .where(FileType.name == "mdp")
@@ -146,9 +143,9 @@ def random_mdp_information():
         # Prepare a dictionary to represent the table row.
         # (If a file is not from a zip file, parent_file_name will be None.)
         table_row = {
-            "Dataset.id_in_origin": random_row.id_in_origin,
+            "Dataset.id_in_origin": random_row.id_in_data_source,
             "Dataset.origin": random_row.dataset_origin,
-            "Dataset.url": random_row.url,
+            "Dataset.url": random_row.url_in_data_source,
             "File.name": random_row.file_name,
             "File.size_in_bytes": random_row.size_in_bytes,
             # Using the parent's name here instead of the ID
@@ -187,11 +184,11 @@ def print_datasets_no_files():
             # Print all the datasets with no files.
             print("Dataset IDs with no files:")
             for dataset in results:
-                print(f"Dataset ID in database: {dataset.dataset_id}\n Datset ID in origin: {dataset.id_in_origin} \n Origin: {dataset.origin_id}\n")
+                print(f"Dataset ID in database: {dataset.dataset_id}\n Datset ID in origin: {dataset.id_in_data_source} \n Origin: {dataset.id_in_data_source}\n")
             print("\n")
 
 def main():
-    print_dataset_origin_summary()
+    print_data_source_summary()
     print("\n\n")
     query_to_dataframe()
     print("\n\n")
