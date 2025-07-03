@@ -13,7 +13,7 @@ from datetime import timedelta
 from db_schema import (
     engine,
     Dataset,
-    DatasetOrigin,
+    DataSource,
     File,
     FileType,
     TrajectoryFile,
@@ -60,6 +60,7 @@ def load_trajectory_data(parquet_path_trajectory: str) -> pd.DataFrame:
     'atom_number',
     'frame_number'
     ]].rename(columns={
+        'dataset_origin': 'data_source',
         'dataset_id': 'dataset_id_in_origin',
         'file_name': 'name'
         })
@@ -74,7 +75,7 @@ def delete_files(engine: Engine) -> None:
     "Delete all files in the TrajectoryFile table"
     with Session(engine) as session:
         trajectory_stmt = delete(TrajectoryFile)
-        result_trajectory =session.exec(trajectory_stmt)
+        result_trajectory = session.exec(trajectory_stmt)
 
         session.commit()
     logger.info(f"Total rows from TRAJECTORY_FILES deleted: {result_trajectory.rowcount}\n")
@@ -103,10 +104,10 @@ def create_trajectory_table(
             xtc_file_name = row["name"]
 
             dataset_id_in_origin = row["dataset_id_in_origin"]
-            dataset_origin = row["dataset_origin"]
-            statement = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin
+            dataset_origin = row["data_source"]
+            statement = select(Dataset).join(DataSource).where(
+                Dataset.id_in_data_source == dataset_id_in_origin,
+                DataSource.name == dataset_origin
                 )
             dataset_obj = session.exec(statement).first()
             if not dataset_obj:

@@ -12,14 +12,11 @@ from datetime import datetime
 from datetime import timedelta
 from db_schema import (
     engine,
-    Barostat,
     Dataset,
-    DatasetOrigin,
+    DataSource,
     File,
     FileType,
-    Integrator,
     ParameterFile,
-    Thermostat,
 )
 from ingest_data import (
     get_or_create_models_with_one_attribute,
@@ -115,9 +112,9 @@ def create_parameters_table(
 
             dataset_id_in_origin = row["dataset_id_in_origin"]
             dataset_origin = row["dataset_origin"]
-            statement = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin
+            statement = select(Dataset).join(DataSource).where(
+                Dataset.id_in_data_source == dataset_id_in_origin,
+                DataSource.name == dataset_origin
                 )
             dataset_obj = session.exec(statement).first()
             if not dataset_obj:
@@ -156,32 +153,15 @@ def create_parameters_table(
             file_id_in_files = file_obj.file_id
 
 
-            # -- Handle Thermostat, Barostat, Integrator --
-            # Thermostat
-            thermostat = row.get("thermostat", None)
-            thermostat_obj = get_or_create_models_with_one_attribute(
-                session, Thermostat, "name", thermostat)
-
-            # Barostat
-            barostat = row.get("barostat", None)
-            barostat_obj = get_or_create_models_with_one_attribute(
-                session, Barostat, "name", barostat)
-
-            # Integrator
-            integrator = row.get("integrator", None)
-            integrator_obj = get_or_create_models_with_one_attribute(
-                session, Integrator, "name", integrator)
-
-
             # -- Create the ParameterFile --
             parameter_obj = ParameterFile(
                 file_id=file_id_in_files,
                 dt=row["dt"],
                 nsteps=row["nsteps"],
                 temperature=row["temperature"],
-                thermostat_id=thermostat_obj.thermostat_id,
-                barostat_id=barostat_obj.barostat_id,
-                integrator_id=integrator_obj.integrator_id
+                thermostat=row.get("thermostat", None),
+                barostat=row.get("barostat", None),
+                integrator=row.get("integrator", None)
             )
 
             session.add(parameter_obj)

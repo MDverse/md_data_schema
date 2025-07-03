@@ -13,12 +13,11 @@ from datetime import timedelta
 from db_schema import (
     engine,
     Dataset,
-    DatasetOrigin,
+    DataSource,
     File,
     FileType,
     TopologyFile,
 )
-
 
 
 # ============================================================================
@@ -106,9 +105,9 @@ def create_topology_table(
 
             dataset_id_in_origin = row["dataset_id_in_origin"]
             dataset_origin = row["dataset_origin"]
-            statement_dataset = select(Dataset).join(DatasetOrigin).where(
-                Dataset.id_in_origin == dataset_id_in_origin,
-                DatasetOrigin.name == dataset_origin
+            statement_dataset = select(Dataset).join(DataSource).where(
+                Dataset.id_in_data_source == dataset_id_in_origin,
+                DataSource.name == dataset_origin
                 )
             dataset_obj = session.exec(statement_dataset).first()
             if not dataset_obj:
