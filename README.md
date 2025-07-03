@@ -67,7 +67,7 @@ This will create the file `report.log` with the information.
 
 If you wish to re-ingest data from any of the following tables:
 - **TopologyFile**
-- **ParameterFile** with **Thermostat**, **Integrator**, and **Barostat**
+- **ParameterFile**
 - **TrajectoryFile**
 
 You can run this command:
