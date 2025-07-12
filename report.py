@@ -1,9 +1,10 @@
-from sqlmodel import Session, select
-from sqlalchemy import func
-from loguru import logger
 from pathlib import Path
+
+from loguru import logger
+from sqlalchemy import func
+from sqlmodel import Session, select
+
 from src.db_schema import (
-    engine,
     Author,
     Dataset,
     DataSource,
@@ -12,6 +13,7 @@ from src.db_schema import (
     ParameterFile,
     TopologyFile,
     TrajectoryFile,
+    engine,
 )
 
 # Log file format
@@ -23,6 +25,7 @@ logger.add(
     format="{time:YYYY-MM-DDTHH:mm:ss} | <lvl>{level:<8} | {message}</lvl>",
     level="DEBUG",
 )
+
 
 def main():
     """
@@ -48,15 +51,16 @@ def main():
             table_name = model.__tablename__
             # Count the number of columns using the model's table metadata.
             n_columns = len(model.__table__.columns)
-            
             # Build a SQL query to count the rows in the table.
             # select(func.count()) creates a query that returns the count of rows.
             # .select_from(model) specifies the table (model) to count rows from.
             statement = select(func.count()).select_from(model)
             n_rows = session.exec(statement).first()
-            
             # Log the table name, number of rows, and number of columns.
-            logger.info(f"Table: {table_name:>16} - Columns: {n_columns:5} - Rows: {n_rows:10,}")
+            logger.info(
+                f"Table: {table_name:>16} - Columns: {n_columns:5} - Rows: {n_rows:10,}"
+            )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
