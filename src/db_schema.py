@@ -96,6 +96,7 @@ class AuthorPaperLink(SQLModel, table=True):
         default=None, foreign_key="papers.paper_id", primary_key=True
     )
 
+
 # ============================================================================
 # Main Tables
 # ============================================================================
@@ -147,6 +148,7 @@ class Dataset(SQLModel, table=True):
         back_populates="dataset"
     )
 
+
 class File(SQLModel, table=True):
     __tablename__ = "files"
 
@@ -186,6 +188,7 @@ class File(SQLModel, table=True):
         back_populates="file", cascade_delete=True
     )
 
+
 class Author(SQLModel, table=True):
     __tablename__ = "authors"
     __table_args__ = (UniqueConstraint("name", "orcid"),)
@@ -218,7 +221,7 @@ class Annotation(SQLModel, table=True):
 
     # Relationships: datasets, provenance_types, annotation_types, -----------
     # files, papers
-    
+
     dataset: "Dataset" = Relationship(back_populates="annotation")
     provenance_type: Optional["ProvenanceType"] = Relationship(
         back_populates="provenance")
@@ -354,6 +357,7 @@ class ParameterFile(SQLModel, table=True):
     # Relationships: files, thermostats, barostats, integrators
     file: File = Relationship(back_populates="parameter_file")
 
+
 class TrajectoryFile(SQLModel, table=True):
     __tablename__ = "trajectory_files"
 
@@ -380,6 +384,7 @@ simulations, the different types of molecules, etc.
 
 These tables have a one-to-many relationship with the main tables.
 """
+
 
 class FileType(SQLModel, table=True):
     __tablename__ = "file_types"
@@ -427,6 +432,7 @@ class DataSource(SQLModel, table=True):
     # Relationships: datasets
     dataset: list[Dataset] = Relationship(back_populates="data_source")
 
+
 class ProvenanceType(SQLModel, table=True):
     __tablename__ = "provenance_types"
 
@@ -436,6 +442,7 @@ class ProvenanceType(SQLModel, table=True):
 
     # Relationships: annotations
     provenance: list[Annotation] = Relationship(back_populates="provenance_type")
+
 
 class AnnotationType(SQLModel, table=True):
     __tablename__ = "annotation_types"
@@ -449,11 +456,12 @@ class AnnotationType(SQLModel, table=True):
     # Relationships: annotations
     annotation: list[Annotation] = Relationship(back_populates="annotation_type")
 
+
 # ============================================================================
 # Engine
 # ============================================================================
 
-sqlite_file_name = "database_testing.db"
+sqlite_file_name = "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 engine = create_engine(sqlite_url)
